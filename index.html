@@ -32,6 +32,8 @@
 
 
     <style>
+        /* Con una ventana abierta, la página de atrás no se desplaza: solo hay una barra */
+        body:has(.fixed.inset-0.flex:not(.hidden)) { overflow: hidden; }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #06182a;
@@ -634,7 +636,7 @@
                                     <i class="fa-solid fa-file-csv"></i> Exportar Hoja de Cálculo
                                 </button>
                                 <button onclick="clearSalesData()" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/50 text-rose-400 text-xs font-semibold rounded-lg border border-slate-700">
-                                    Reiniciar Turno
+                                    <i class="fa-solid fa-rotate-left mr-1"></i>Reiniciar ventas
                                 </button>
                             </div>
                         </div>
@@ -855,11 +857,12 @@
                 <label class="block text-xs text-slate-300 font-semibold"><i class="fa-brands fa-whatsapp text-emerald-400 mr-1"></i>WhatsApp del cliente</label>
                 <div class="flex gap-2">
                     <input type="tel" id="ticket-phone-input" inputmode="tel" placeholder="10 dígitos, ej. 744 123 4567" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-emerald-500">
-                    <button onclick="sendTicketWhatsApp()" class="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5"><i class="fa-brands fa-whatsapp text-base"></i> Texto</button>
                 </div>
                 <button onclick="sendTicketPdfWhatsApp()" id="btn-send-ticket-pdf" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-md"><i class="fa-solid fa-file-pdf text-sm"></i> ENVIAR TICKET EN PDF</button>
                 <p class="text-[10px] text-slate-500 leading-snug">En el celular se abre el menú de compartir (elige WhatsApp y el contacto). En computadora se descarga el PDF y se abre el chat para que lo adjuntes.</p>
             </div>
+
+            <button id="btn-ticket-proof" onclick="openSaleProof(currentTicketData && currentTicketData.saleFolio)" class="hidden w-full py-2.5 bg-sky-700 hover:bg-sky-600 text-white font-black text-xs rounded-xl items-center justify-center gap-2 shadow-md"><i class="fa-solid fa-receipt text-sm"></i> VER COMPROBANTE DE TRANSFERENCIA</button>
 
             <div class="flex gap-2">
                 <button onclick="closeModal('modal-ticket-receipt')" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl">Cerrar</button>
@@ -906,6 +909,18 @@
             </div>
 
             <button onclick="closeModal('modal-open-guests')" class="w-full py-2 bg-slate-800 text-slate-400 text-xs font-bold rounded-xl">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: VER COMPROBANTE DE TRANSFERENCIA -->
+    <div id="modal-proof-view" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-4 shadow-2xl space-y-3">
+            <div class="flex justify-between items-center">
+                <h3 class="font-extrabold text-white text-sm"><i class="fa-solid fa-receipt text-sky-400 mr-1.5"></i>Comprobante · <span id="proof-view-table"></span></h3>
+                <button onclick="closeModal('modal-proof-view')" class="text-slate-400 hover:text-white text-lg">&times;</button>
+            </div>
+            <img id="proof-view-img" src="" alt="Comprobante" class="w-full max-h-[70vh] object-contain rounded-xl bg-white">
+            <button onclick="closeModal('modal-proof-view')" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl">Cerrar</button>
         </div>
     </div>
 
@@ -964,16 +979,16 @@
 
     <!-- MODAL E: COBRO Y CIERRE DE MESA (SOLO EFECTIVO) -->
     <div id="modal-checkout-sale" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-4 sm:p-5 shadow-2xl flex flex-col gap-3" style="max-height:calc(100dvh - 1.5rem)">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2 shrink-0">
                 <h3 class="font-extrabold text-white text-base flex items-center gap-2">
                     <i class="fa-solid fa-cash-register text-emerald-400"></i> Cobrar y Cerrar Venta
                 </h3>
                 <button onclick="closeModal('modal-checkout-sale')" class="text-slate-400 hover:text-white text-lg">&times;</button>
             </div>
 
-            <div class="space-y-4 text-xs">
-                <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+            <div class="space-y-3 text-xs flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
+                <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1.5">
                     <div class="flex justify-between text-slate-300">
                         <span>Mesa:</span>
                         <strong class="text-white" id="checkout-table-name">Mesa 1</strong>
@@ -994,10 +1009,10 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1.5">Forma de pago</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button type="button" id="pay-method-cash" onclick="setCheckoutPaymentMethod('Efectivo')" class="py-3 rounded-xl border font-extrabold text-xs flex items-center justify-center gap-2 transition-all">
+                        <button type="button" id="pay-method-cash" onclick="setCheckoutPaymentMethod('Efectivo', true)" class="py-3 rounded-xl border font-extrabold text-xs flex items-center justify-center gap-2 transition-all">
                             <i class="fa-solid fa-money-bill-wave"></i> Efectivo
                         </button>
-                        <button type="button" id="pay-method-transfer" onclick="setCheckoutPaymentMethod('Transferencia')" class="py-3 rounded-xl border font-extrabold text-xs flex items-center justify-center gap-2 transition-all">
+                        <button type="button" id="pay-method-transfer" onclick="setCheckoutPaymentMethod('Transferencia', true)" class="py-3 rounded-xl border font-extrabold text-xs flex items-center justify-center gap-2 transition-all">
                             <i class="fa-solid fa-building-columns"></i> Transferencia
                         </button>
                     </div>
@@ -1011,7 +1026,7 @@
                 </div>
             </div>
 
-            <div class="flex gap-3 pt-2">
+            <div class="flex gap-3 pt-1 shrink-0">
                 <button onclick="closeModal('modal-checkout-sale')" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl">Cancelar</button>
                 <button id="btn-confirm-checkout" onclick="confirmFinalCheckout()" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/20">CONFIRMAR COBRO</button>
             </div>
@@ -1366,6 +1381,8 @@
         }
 
         function refreshAllTableViews() {
+            const _co = document.getElementById('modal-checkout-sale');
+            if (_co && !_co.classList.contains('hidden') && pendingCheckoutTableId) renderTransferInfo();
             renderWaitressTablesList();
             renderWaitressOrderPanel();
             renderPayingTablesBanner();
@@ -1382,7 +1399,11 @@
 
             const payingTables = tables.filter(t => t.status === 'paying' && canViewTable(t));
             const callingTables = tables.filter(t => t.calling && canViewTable(t));
-            if (payingTables.length === 0 && callingTables.length === 0) {
+            const proofTables = isAdminUnlocked ? tables.filter(t => t.transferProof && t.transferProof.status === 'pending') : [];
+            const confirmedTables = currentWaitressSession
+                ? tables.filter(t => t.waiter === currentWaitressSession && t.payMethod === 'Transferencia' && t.transferProof && t.transferProof.status === 'confirmed')
+                : [];
+            if (payingTables.length === 0 && callingTables.length === 0 && proofTables.length === 0 && confirmedTables.length === 0) {
                 banner.classList.add('hidden');
                 chips.innerHTML = '';
                 return;
@@ -1401,7 +1422,17 @@
                     <span class="text-[10px] text-slate-800">(${t.waiter})</span>
                 </button>
             `).join('');
-            chips.innerHTML = callChips + billChips;
+            const proofChips = proofTables.map(t => `
+                <button onclick="switchRole('admin'); setAdminSubtab('live-monitor')" class="px-2.5 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-[11px] flex items-center gap-1.5 shadow">
+                    <span>💳 ${t.name}: comprobante por confirmar</span>
+                </button>
+            `).join('');
+            const confirmedChips = confirmedTables.map(t => `
+                <button onclick="switchRole('waitress'); selectWaitressTable(${t.id})" class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] flex items-center gap-1.5 shadow">
+                    <span>✅ ${t.name}: transferencia confirmada, ya puedes cobrar</span>
+                </button>
+            `).join('');
+            chips.innerHTML = callChips + proofChips + confirmedChips + billChips;
         }
 
         function startLiveClock() {
@@ -1473,49 +1504,116 @@
             handleIncomingBillAlert(payload);
         }
 
-        function handleIncomingBillAlert(payload) {
-            if (!payload || !payload.id || payload.id === lastPlayedAlertId) return;
-            lastPlayedAlertId = payload.id;
-            if (customerLockedMesaCode) return;
+        const callRemindState = {};
+        const CALL_REMIND_MS = 20000;
 
-            showToast(payload.kind === 'call'
-                ? `🙋 ${payload.tableName} llama a la mesera • Atiende: ${payload.waiterName}`
-                : `🔔 Cuenta pedida en ${payload.tableName} • Atiende: ${payload.waiterName}`, 'info');
-            renderPayingTablesBanner();
-
-            if (!storeConfig.soundAlerts) return;
-
+        function alertChime() {
             try {
                 const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (AudioCtx) {
-                    if (!audioCtxInstance) audioCtxInstance = new AudioCtx();
-                    if (audioCtxInstance.state === 'suspended') audioCtxInstance.resume();
-
-                    const osc = audioCtxInstance.createOscillator();
-                    const gain = audioCtxInstance.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(880, audioCtxInstance.currentTime);
-                    osc.frequency.setValueAtTime(1174.66, audioCtxInstance.currentTime + 0.14);
-                    gain.gain.setValueAtTime(0.2, audioCtxInstance.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtxInstance.currentTime + 0.45);
-                    osc.connect(gain);
-                    gain.connect(audioCtxInstance.destination);
-                    osc.start();
-                    osc.stop(audioCtxInstance.currentTime + 0.45);
-                }
+                if (!AudioCtx) return;
+                if (!audioCtxInstance) audioCtxInstance = new AudioCtx();
+                if (audioCtxInstance.state === 'suspended') audioCtxInstance.resume();
+                const osc = audioCtxInstance.createOscillator();
+                const gain = audioCtxInstance.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtxInstance.currentTime);
+                osc.frequency.setValueAtTime(1174.66, audioCtxInstance.currentTime + 0.14);
+                gain.gain.setValueAtTime(0.2, audioCtxInstance.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtxInstance.currentTime + 0.45);
+                osc.connect(gain);
+                gain.connect(audioCtxInstance.destination);
+                osc.start();
+                osc.stop(audioCtxInstance.currentTime + 0.45);
             } catch (e) {}
+        }
 
+        function alertSpeak(text) {
             try {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel();
-                    const msg = new SpeechSynthesisUtterance((payload.kind === 'call'
-                        ? `Aviso para mesera: ${payload.tableName} llama a la mesera. Atiende ${payload.waiterName}.`
-                        : `Aviso para mesera y caja: cuenta pedida en ${payload.tableName}. Atiende ${payload.waiterName}.`));
+                    const msg = new SpeechSynthesisUtterance(text);
                     msg.lang = 'es-MX';
                     msg.rate = 1.05;
                     window.speechSynthesis.speak(msg);
                 }
             } catch (e) {}
+        }
+
+        function handleIncomingBillAlert(payload) {
+            if (!payload || !payload.id || payload.id === lastPlayedAlertId) return;
+            lastPlayedAlertId = payload.id;
+            if (customerLockedMesaCode) return;
+
+            const kind = payload.kind || 'bill';
+            // El comprobante solo le avisa al admin; la confirmación solo a la mesera de esa mesa
+            if (kind === 'proof' && !isAdminUnlocked) return;
+            if (kind === 'confirmed' && !(currentWaitressSession && currentWaitressSession === payload.waiterName)) return;
+
+            let toastMsg, speech;
+            if (kind === 'call') {
+                toastMsg = `🙋 ${payload.tableName} llama a la mesera • Atiende: ${payload.waiterName}`;
+                speech = `Aviso para mesera y administración: ${payload.tableName} llama a la mesera. Atiende ${payload.waiterName}.`;
+                callRemindState[payload.tableName] = Date.now();
+            } else if (kind === 'proof') {
+                toastMsg = `💳 ${payload.tableName} subió su comprobante de transferencia. Revísalo y confírmalo.`;
+                speech = `Aviso para administración: ${payload.tableName} subió su comprobante de transferencia.`;
+            } else if (kind === 'confirmed') {
+                toastMsg = `✅ El admin confirmó la transferencia de ${payload.tableName}. Ya puedes cobrar.`;
+                speech = `${payload.tableName}: el administrador confirmó la transferencia. Ya puedes cobrar.`;
+            } else {
+                toastMsg = `🔔 Cuenta pedida en ${payload.tableName} • Atiende: ${payload.waiterName}`;
+                speech = `Aviso para mesera y caja: cuenta pedida en ${payload.tableName}. Atiende ${payload.waiterName}.`;
+            }
+
+            showToast(toastMsg, 'info');
+            renderPayingTablesBanner();
+
+            if (!storeConfig.soundAlerts) return;
+            alertChime();
+            alertSpeak(speech);
+        }
+
+        // Mientras una mesa siga llamando, suena de nuevo cada 20 s (admin y la mesera de esa mesa) hasta marcar "Ya lo atendí"
+        setInterval(() => {
+            if (customerLockedMesaCode) return;
+            const now = Date.now();
+            const due = [];
+            tables.forEach(t => {
+                if (!t.calling) { delete callRemindState[t.name]; return; }
+                const mine = isAdminUnlocked || (currentWaitressSession && t.waiter === currentWaitressSession);
+                if (!mine) return;
+                if (callRemindState[t.name] === undefined) { callRemindState[t.name] = now; return; }
+                if (now - callRemindState[t.name] >= CALL_REMIND_MS) {
+                    callRemindState[t.name] = now;
+                    due.push(t);
+                }
+            });
+            if (due.length === 0 || !storeConfig.soundAlerts) return;
+            alertChime();
+            alertSpeak(due.length === 1
+                ? `Recordatorio: ${due[0].name} sigue llamando a la mesera. Atiende ${due[0].waiter}.`
+                : `Recordatorio: ${due.map(t => t.name).join(' y ')} siguen llamando a la mesera.`);
+        }, 1000);
+
+        // Compara mesas antes/después de un cambio en la nube y dispara los avisos que correspondan
+        function detectTableAlerts(previousTables) {
+            tables.forEach(t => {
+                const prev = previousTables.find(pt => pt.id === t.id);
+                if (t.status === 'paying' && (!prev || prev.status !== 'paying')) {
+                    broadcastBillAlert(t.name, t.waiter);
+                }
+                if (t.calling && (!prev || !prev.calling)) {
+                    broadcastBillAlert(t.name, t.waiter, 'call');
+                }
+                const st = t.transferProof && t.transferProof.status;
+                const prevProof = prev && prev.transferProof;
+                if (st === 'pending' && (!prevProof || prevProof.at !== t.transferProof.at)) {
+                    broadcastBillAlert(t.name, t.waiter, 'proof');
+                }
+                if (st === 'confirmed' && prev && !(prevProof && prevProof.status === 'confirmed')) {
+                    broadcastBillAlert(t.name, t.waiter, 'confirmed');
+                }
+            });
         }
 
         function testBillVoiceAlert() {
@@ -2129,6 +2227,7 @@
             };
             renderTicketSheet(currentTicketData);
             document.getElementById('ticket-phone-input').value = table.customerPhone ? formatPhoneDisplay(table.customerPhone) : '';
+            { const pb = document.getElementById('btn-ticket-proof'); if (pb) { pb.classList.add('hidden'); pb.classList.remove('flex'); } }
             openModal('modal-ticket-receipt');
             scheduleTicketPdfPrefetch();
         }
@@ -2148,57 +2247,10 @@
             };
             renderTicketSheet(currentTicketData);
             document.getElementById('ticket-phone-input').value = sale.phone ? formatPhoneDisplay(sale.phone) : '';
+            const pb = document.getElementById('btn-ticket-proof');
+            if (pb) { pb.classList.toggle('hidden', !sale.proof); pb.classList.toggle('flex', !!sale.proof); }
             openModal('modal-ticket-receipt');
             scheduleTicketPdfPrefetch();
-        }
-
-        function sendTicketWhatsApp() {
-            if (!currentTicketData) return;
-            const phone = normalizePhone(document.getElementById('ticket-phone-input').value);
-            if (!phone) {
-                showToast('Escribe un número de WhatsApp válido (10 dígitos)', 'warning');
-                return;
-            }
-            const d = currentTicketData;
-
-            if (d.saleFolio) {
-                const sale = salesHistory.find(x => x.id === d.saleFolio);
-                if (sale && sale.phone !== phone) {
-                    sale.phone = phone;
-                    saveData();
-                    renderAdminReports();
-                }
-            } else if (d.tableId) {
-                const t = tables.find(x => x.id === d.tableId);
-                if (t && t.customerPhone !== phone) {
-                    t.customerPhone = phone;
-                    saveData();
-                    refreshAllTableViews();
-                }
-            }
-
-            const lines = [];
-            lines.push(`🧾 *${String(d.businessName).toUpperCase()}*`);
-            lines.push(`${d.tableName} • ${d.when}`);
-            if (d.saleFolio) lines.push(`Folio: ${d.folio}`);
-            lines.push('━━━━━━━━━━━━━━');
-            if (d.items && d.items.length) {
-                d.items.forEach(i => {
-                    lines.push(`*${i.qty} × ${i.name}*`);
-                    lines.push(`   ${formatTicketMoney(i.price)} c/u  →  ${formatTicketMoney(i.price * i.qty)}`);
-                });
-                lines.push('━━━━━━━━━━━━━━');
-                lines.push(`Artículos: ${d.items.reduce((n, i) => n + (i.qty || 0), 0)}`);
-                lines.push(`Subtotal: ${formatTicketMoney(d.total)}`);
-            }
-            lines.push(`*TOTAL: ${formatTicketMoney(d.total)} MXN*`);
-            if (d.saleFolio) {
-                const paidSale = salesHistory.find(x => x.id === d.saleFolio);
-                lines.push(`Pago: ${(paidSale && paidSale.method) || 'Efectivo'}`);
-            }
-            lines.push('¡Gracias por su visita! 🙏');
-
-            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
         }
 
         // --- ENVIAR EL TICKET EN PDF POR WHATSAPP ---
@@ -2299,7 +2351,7 @@
 
                 if (phone) {
                     const w = window.open(`https://wa.me/${phone}?text=${encodeURIComponent(caption + '\n\n📎 Te adjunto el ticket en PDF.')}`, '_blank');
-                    showToast(w ? 'PDF descargado: adjúntalo en el chat de WhatsApp que se abrió' : 'PDF descargado. Toca "Texto" para abrir el chat y adjúntalo', 'info');
+                    showToast(w ? 'PDF descargado: adjúntalo en el chat de WhatsApp que se abrió' : 'PDF descargado. Permite las ventanas emergentes para abrir el chat y adjúntalo', 'info');
                 } else {
                     showToast('PDF descargado. Escribe el WhatsApp del cliente para abrir su chat', 'info');
                 }
@@ -2374,6 +2426,10 @@
             sourceTable.calling = false;
             targetTable.customerPhone = sourceTable.customerPhone || '';
             sourceTable.customerPhone = '';
+            targetTable.payMethod = sourceTable.payMethod || '';
+            targetTable.transferProof = sourceTable.transferProof || null;
+            sourceTable.payMethod = '';
+            sourceTable.transferProof = null;
             sourceTable.status = 'free';
             sourceTable.guests = 0;
             sourceTable.items = [];
@@ -2482,6 +2538,8 @@
                 table.guests = 0;
                 table.calling = false;
                 table.customerPhone = '';
+                table.payMethod = '';
+                table.transferProof = null;
 
                 if (activeWaitressTableId === table.id) {
                     activeWaitressTableId = null;
@@ -2654,6 +2712,19 @@
                 + `</div>`;
         }
 
+        function waiterTransferStatusHtml(table) {
+            const st = transferStatusOf(table);
+            if (st === 'confirmed') {
+                return `<div class="bg-emerald-500/15 border border-emerald-500/40 rounded-xl p-3 text-xs font-extrabold text-emerald-200"><i class="fa-solid fa-circle-check mr-1.5"></i>Transferencia confirmada por el admin. Ya puedes COBRAR.</div>`;
+            }
+            const msg = st === 'pending'
+                ? 'Comprobante recibido. Esperando que el admin lo confirme.'
+                : st === 'rejected'
+                    ? 'El admin rechazó el comprobante. El cliente debe subirlo otra vez.'
+                    : 'Pago por transferencia: esperando el comprobante del cliente.';
+            return `<div class="bg-sky-500/10 border border-sky-500/40 rounded-xl p-3 text-xs font-bold text-sky-200"><i class="fa-solid fa-building-columns mr-1.5"></i>${msg}</div>`;
+        }
+
         function renderWaitressOrderPanel() {
             const container = document.getElementById('waitress-order-panel');
             if (activeWaitressTableId !== null) {
@@ -2731,6 +2802,8 @@
 
                 <div id="waitress-outer-scroll" class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
                     
+                    ${table.payMethod === 'Transferencia' ? waiterTransferStatusHtml(table) : ''}
+
                     ${table.calling ? `
                         <div class="flex items-center justify-between gap-3 bg-amber-500/15 border border-amber-500/40 rounded-xl p-3">
                             <p class="text-xs font-bold text-amber-200"><i class="fa-solid fa-bell-concierge mr-1.5"></i>El cliente llamó a la mesera</p>
@@ -3114,7 +3187,7 @@
             broadcastBillAlert(table.name, table.waiter);
         }
 
-        function setCheckoutPaymentMethod(method) {
+        function setCheckoutPaymentMethod(method, fromUser) {
             selectedPaymentMethod = method === 'Transferencia' ? 'Transferencia' : 'Efectivo';
             const on = 'py-3 rounded-xl border font-extrabold text-xs flex items-center justify-center gap-2 transition-all bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-600/20';
             const off = 'py-3 rounded-xl border font-extrabold text-xs flex items-center justify-center gap-2 transition-all bg-slate-950 border-slate-700 text-slate-400 hover:text-white';
@@ -3122,7 +3195,25 @@
             const transferBtn = document.getElementById('pay-method-transfer');
             if (cashBtn) cashBtn.className = selectedPaymentMethod === 'Efectivo' ? on : off;
             if (transferBtn) transferBtn.className = selectedPaymentMethod === 'Transferencia' ? on : off;
+
+            // Si la mesera elige la forma de pago, se guarda en la mesa para que el cliente la vea en su celular
+            if (fromUser && pendingCheckoutTableId) {
+                const t = tables.find(x => x.id === pendingCheckoutTableId);
+                if (t) {
+                    const newMethod = selectedPaymentMethod === 'Transferencia' ? 'Transferencia' : '';
+                    if ((t.payMethod || '') !== newMethod) {
+                        t.payMethod = newMethod;
+                        saveData();
+                        refreshAllTableViews();
+                        if (newMethod) showToast('El cliente ya ve los datos de transferencia y puede subir su comprobante', 'info');
+                    }
+                }
+            }
             renderTransferInfo();
+        }
+
+        function transferStatusOf(table) {
+            return (table && table.transferProof && table.transferProof.status) || '';
         }
 
         function escapeHtmlText(str) {
@@ -3132,17 +3223,33 @@
         function renderTransferInfo() {
             const box = document.getElementById('checkout-transfer-info');
             if (!box) return;
+            const gateTable = tables.find(x => x.id === pendingCheckoutTableId);
+            const gateBtn = document.getElementById('btn-confirm-checkout');
+            const gated = selectedPaymentMethod === 'Transferencia' && !isAdminUnlocked && transferStatusOf(gateTable) !== 'confirmed';
+            if (gateBtn) {
+                gateBtn.disabled = gated;
+                gateBtn.classList.toggle('opacity-40', gated);
+                gateBtn.classList.toggle('cursor-not-allowed', gated);
+            }
             if (selectedPaymentMethod !== 'Transferencia') {
                 box.classList.add('hidden');
                 box.innerHTML = '';
                 return;
             }
             box.classList.remove('hidden');
+            const proofSt = transferStatusOf(gateTable);
+            const proofLine = proofSt === 'confirmed'
+                ? '<p class="text-xs font-extrabold text-emerald-300"><i class="fa-solid fa-circle-check mr-1"></i>Transferencia confirmada por el admin: ya puedes cobrar.</p>'
+                : proofSt === 'pending'
+                    ? '<p class="text-xs font-bold text-amber-300"><i class="fa-solid fa-hourglass-half mr-1"></i>Comprobante recibido. Esperando que el admin lo confirme para poder cobrar.</p>'
+                    : proofSt === 'rejected'
+                        ? '<p class="text-xs font-bold text-rose-300"><i class="fa-solid fa-circle-xmark mr-1"></i>El admin rechazó el comprobante. El cliente debe subirlo de nuevo.</p>'
+                        : '<p class="text-xs font-bold text-sky-200"><i class="fa-solid fa-mobile-screen mr-1"></i>Esperando que el cliente suba su comprobante desde su QR.</p>';
             const bank = (storeConfig.bankName || '').trim();
             const holder = (storeConfig.bankHolder || '').trim();
             const clabe = (storeConfig.bankClabe || '').trim();
             if (!bank && !holder && !clabe) {
-                box.innerHTML = '<p class="text-[11px] text-amber-300 font-semibold">Aún no hay datos bancarios. Captúralos en Admin → Caja.</p>';
+                box.innerHTML = '<p class="text-[11px] text-amber-300 font-semibold">Aún no hay datos bancarios. Captúralos en Admin → Caja.</p>' + proofLine;
                 return;
             }
             box.innerHTML = `
@@ -3153,6 +3260,7 @@
                     <p class="text-sm font-mono font-black text-white break-all">${escapeHtmlText(clabe)}</p>
                     <button type="button" onclick="copyBankClabe()" class="shrink-0 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] rounded-lg"><i class="fa-regular fa-copy mr-1"></i>Copiar</button>
                 </div>` : ''}
+                ${proofLine}
             `;
         }
 
@@ -3189,7 +3297,7 @@
             }
 
             pendingCheckoutTableId = table.id;
-            setCheckoutPaymentMethod('Efectivo');
+            setCheckoutPaymentMethod(table.payMethod === 'Transferencia' ? 'Transferencia' : 'Efectivo');
             document.getElementById('checkout-table-name').textContent = table.name;
             document.getElementById('checkout-waiter-name').textContent = table.waiter;
             checkoutSplitMode = false;
@@ -3206,11 +3314,48 @@
             openModal('modal-checkout-sale');
         }
 
+        // Reduce el comprobante guardado en la venta para no llenar el documento de la nube (límite 1 MB)
+        function shrinkSaleProof(folio) {
+            const sale = salesHistory.find(x => x.id === folio);
+            if (!sale || !sale.proof) return;
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const scale = Math.min(1, 700 / Math.max(img.width, img.height));
+                    const c = document.createElement('canvas');
+                    c.width = Math.max(1, Math.round(img.width * scale));
+                    c.height = Math.max(1, Math.round(img.height * scale));
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(0, 0, c.width, c.height);
+                    ctx.drawImage(img, 0, 0, c.width, c.height);
+                    const small = c.toDataURL('image/jpeg', 0.5);
+                    if (small.length < sale.proof.length) sale.proof = small;
+                    saveData();
+                    renderAdminReports();
+                } catch (e) {}
+            };
+            img.src = sale.proof;
+        }
+
+        function openSaleProof(folio) {
+            const sale = salesHistory.find(x => x.id === folio);
+            if (!sale || !sale.proof) return;
+            document.getElementById('proof-view-table').textContent = sale.tableName + ' · ' + sale.id;
+            document.getElementById('proof-view-img').src = sale.proof;
+            openModal('modal-proof-view');
+        }
+
         function confirmFinalCheckout() {
             const targetId = pendingCheckoutTableId || activeWaitressTableId;
             if (!targetId) return;
             const table = tables.find(t => t.id === targetId);
             if (!table) return;
+
+            if (selectedPaymentMethod === 'Transferencia' && !isAdminUnlocked && transferStatusOf(table) !== 'confirmed') {
+                showToast('Espera a que el administrador confirme el comprobante de transferencia para poder cobrar', 'warning');
+                return;
+            }
 
             // Qué se cobra ahora: toda la cuenta o solo lo seleccionado al dividir
             const chargeItems = getCheckoutChargeItems(table);
@@ -3242,10 +3387,13 @@
                 method: selectedPaymentMethod,
                 guests: table.guests || 0,
                 phone: salePhone,
+                proof: (selectedPaymentMethod === 'Transferencia' && table.transferProof && table.transferProof.image) ? table.transferProof.image : '',
                 partial: isPartial,
                 items: chargeItems.map(i => ({ name: i.name, price: i.price, qty: i.qty, notes: i.notes || '' })),
                 total: total
             });
+
+            if (salesHistory[0] && salesHistory[0].proof) shrinkSaleProof(folio);
 
             const s = staff.find(st => st.name === table.waiter);
             if (s) {
@@ -3261,12 +3409,16 @@
                 });
                 table.items = table.items.filter(i => i.qty > 0);
                 if (table.status === 'paying') table.status = 'occupied';
+                table.payMethod = '';
+                table.transferProof = null;
             } else {
                 table.status = 'free';
                 table.items = [];
                 table.guests = 0;
                 table.calling = false;
                 table.customerPhone = '';
+                table.payMethod = '';
+                table.transferProof = null;
 
                 if (activeWaitressTableId === table.id) {
                     activeWaitressTableId = null;
@@ -3501,6 +3653,27 @@
                     `;
                 }
 
+                let transferAdminHtml = '';
+                if (table.payMethod === 'Transferencia' && table.items.length > 0) {
+                    const tp = table.transferProof;
+                    const tst = transferStatusOf(table);
+                    const hasImg = !!(tp && tp.image);
+                    const tLabel = tst === 'confirmed' ? 'Confirmada: la mesera ya puede cobrar' : tst === 'pending' ? 'Comprobante recibido' : tst === 'rejected' ? 'Comprobante rechazado' : 'Esperando comprobante del cliente';
+                    transferAdminHtml = `
+                        <div class="mt-2 rounded-xl border p-2.5 space-y-1.5 ${tst === 'confirmed' ? 'border-emerald-500/40 bg-emerald-950/20' : 'border-sky-500/40 bg-sky-950/30'}">
+                            <p class="text-[10px] font-bold uppercase tracking-wider ${tst === 'confirmed' ? 'text-emerald-300' : 'text-sky-300'}"><i class="fa-solid fa-building-columns mr-1"></i>Transferencia · ${tLabel}</p>
+                            ${hasImg ? `<img src="${tp.image}" onclick="openProofViewer(${table.id})" alt="Comprobante" class="w-full max-h-28 object-cover rounded-lg border border-slate-700 cursor-zoom-in">` : ''}
+                            ${tst !== 'confirmed' ? `
+                                <div class="flex gap-1.5">
+                                    <button onclick="adminConfirmTransfer(${table.id})" class="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-lg text-[10px]"><i class="fa-solid fa-circle-check mr-1"></i>${hasImg ? 'Confirmar que llegó' : 'Confirmar sin comprobante'}</button>
+                                    ${hasImg ? `<button onclick="adminRejectTransfer(${table.id})" class="py-1.5 px-2 bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 rounded-lg text-[10px] font-bold">Rechazar</button>` : ''}
+                                </div>` : ''}
+                        </div>`;
+                }
+                const callAttendHtml = table.calling
+                    ? `<button onclick="clearTableCall(${table.id})" class="w-full py-1.5 px-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-lg text-[10px] mt-2"><i class="fa-solid fa-bell-concierge mr-1"></i>Cliente llama · Marcar atendido</button>`
+                    : '';
+
                 const card = document.createElement('div');
                 card.className = `glass-panel rounded-2xl p-4 border flex flex-col justify-between min-h-[190px] ${bg}`;
                 card.innerHTML = `
@@ -3517,6 +3690,8 @@
                             <p class="text-[10px] text-slate-400 font-medium">Consumo Actual</p>
                             <p class="text-xl font-black ${table.status !== 'free' ? 'text-emerald-400' : 'text-slate-600'}">$${total.toFixed(2)}</p>
                             ${itemsDetailHtml}
+                            ${callAttendHtml}
+                            ${transferAdminHtml}
                             ${directChargeBtn}
                             ${adminCorrectBtn}
                             ${quickCorrectionHtml}
@@ -3535,6 +3710,36 @@
                 `;
                 grid.appendChild(card);
             });
+        }
+
+        // --- COMPROBANTES DE TRANSFERENCIA (admin) ---
+        function openProofViewer(tableId) {
+            const t = tables.find(x => x.id === tableId);
+            if (!t || !t.transferProof || !t.transferProof.image) return;
+            document.getElementById('proof-view-table').textContent = t.name;
+            document.getElementById('proof-view-img').src = t.transferProof.image;
+            openModal('modal-proof-view');
+        }
+
+        function adminConfirmTransfer(tableId) {
+            if (!isAdminUnlocked) { denyNeedsAdmin(); return; }
+            const t = tables.find(x => x.id === tableId);
+            if (!t) return;
+            t.transferProof = { ...(t.transferProof || {}), status: 'confirmed', confirmedAt: new Date().toISOString() };
+            saveData();
+            refreshAllTableViews();
+            broadcastBillAlert(t.name, t.waiter, 'confirmed');
+            showToast(`Transferencia de ${t.name} confirmada. ${t.waiter} ya puede cobrar.`, 'success');
+        }
+
+        function adminRejectTransfer(tableId) {
+            if (!isAdminUnlocked) { denyNeedsAdmin(); return; }
+            const t = tables.find(x => x.id === tableId);
+            if (!t || !confirm(`¿Rechazar el comprobante de ${t.name}? El cliente tendrá que subirlo de nuevo.`)) return;
+            t.transferProof = { status: 'rejected', at: new Date().toISOString(), image: '' };
+            saveData();
+            refreshAllTableViews();
+            showToast(`Comprobante de ${t.name} rechazado`, 'info');
         }
 
         // --- GESTIÓN DE MESAS ---
@@ -4145,6 +4350,7 @@
                         <button onclick="openTicketModalForSale('${s.id}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-lg text-[11px] font-bold">
                             <i class="fa-solid fa-file-invoice"></i> Ticket
                         </button>
+                        ${s.proof ? `<button onclick="openSaleProof('${s.id}')" class="ml-1 px-2.5 py-1 bg-sky-900/50 hover:bg-sky-800/60 text-sky-300 rounded-lg text-[11px] font-bold"><i class="fa-solid fa-receipt"></i> Comprobante</button>` : ''}
                     </td>
                     <td class="p-4 text-right font-black text-emerald-400">$${s.total.toFixed(2)}</td>
                 `;
@@ -4173,12 +4379,13 @@
         }
 
         function clearSalesData() {
-            if (confirm('¿Reiniciar las ventas del turno?')) {
+            if (!isAdminUnlocked) { denyNeedsAdmin(); return; }
+            if (confirm('¿Borrar TODAS las ventas y comprobantes y reiniciar los totales de las meseras? No se puede deshacer.')) {
                 salesHistory = [];
                 staff.forEach(s => { s.salesCount = 0; s.salesTotal = 0; });
                 saveData();
                 renderAdminReports();
-                showToast('Turno de ventas reiniciado', 'info');
+                showToast('Ventas reiniciadas', 'info');
             }
         }
 
@@ -4267,15 +4474,7 @@
                         syncStoreConfigInputs();
                     }
 
-                    tables.forEach(t => {
-                        const prev = previousTables.find(pt => pt.id === t.id);
-                        if (t.status === 'paying' && (!prev || prev.status !== 'paying')) {
-                            broadcastBillAlert(t.name, t.waiter);
-                        }
-                        if (t.calling && (!prev || !prev.calling)) {
-                            broadcastBillAlert(t.name, t.waiter, 'call');
-                        }
-                    });
+                    detectTableAlerts(previousTables);
 
                     saveData(true);
                     populateWaitressSessionSelect();
@@ -4372,15 +4571,7 @@
                         updateSoundToggleUI();
                     }
 
-                    tables.forEach(t => {
-                        const prev = previousTables.find(pt => pt.id === t.id);
-                        if (t.status === 'paying' && (!prev || prev.status !== 'paying')) {
-                            broadcastBillAlert(t.name, t.waiter);
-                        }
-                        if (t.calling && (!prev || !prev.calling)) {
-                            broadcastBillAlert(t.name, t.waiter, 'call');
-                        }
-                    });
+                    detectTableAlerts(previousTables);
 
                     saveData(true);
                     populateWaitressSessionSelect();
@@ -4516,6 +4707,50 @@
                 `;
             }).join('');
 
+            let transferCustomerHtml = '';
+            if (table.payMethod === 'Transferencia' && table.items.length > 0) {
+                const bank = (storeConfig.bankName || '').trim();
+                const holder = (storeConfig.bankHolder || '').trim();
+                const clabe = (storeConfig.bankClabe || '').trim();
+                const tst = transferStatusOf(table);
+                const tp = table.transferProof;
+                const uploadBtn = (label) => `
+                    <label class="block w-full text-center cursor-pointer py-3 bg-sky-600 hover:bg-sky-500 text-white font-extrabold rounded-2xl text-xs">
+                        <i class="fa-solid fa-camera mr-1.5"></i>${label}
+                        <input type="file" accept="image/*" onchange="uploadTransferProof(event)" class="hidden">
+                    </label>`;
+                let proofBlock;
+                if (tst === 'confirmed') {
+                    proofBlock = `<div class="bg-emerald-500/15 border border-emerald-500/40 rounded-2xl p-3 text-xs font-bold text-emerald-200"><i class="fa-solid fa-circle-check mr-1.5"></i>¡Pago confirmado! Tu mesera ya puede cerrar tu cuenta.</div>`;
+                } else if (tst === 'pending') {
+                    proofBlock = `
+                        <div class="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-3 space-y-2">
+                            <p class="text-xs font-bold text-amber-200"><i class="fa-solid fa-hourglass-half mr-1.5"></i>Comprobante enviado. Esperando confirmación del restaurante…</p>
+                            ${tp && tp.image ? `<img src="${tp.image}" alt="Tu comprobante" class="w-full max-h-40 object-contain rounded-xl bg-white">` : ''}
+                        </div>
+                        ${uploadBtn('Cambiar comprobante')}`;
+                } else {
+                    proofBlock = `
+                        ${tst === 'rejected' ? `<div class="bg-rose-500/15 border border-rose-500/40 rounded-2xl p-3 text-xs font-bold text-rose-200"><i class="fa-solid fa-circle-xmark mr-1.5"></i>No pudimos validar tu comprobante. Súbelo de nuevo, por favor.</div>` : ''}
+                        ${uploadBtn('SUBIR MI COMPROBANTE')}
+                        <p class="text-[10px] text-slate-500 text-center">Toma o elige una captura del comprobante de tu banco.</p>`;
+                }
+                transferCustomerHtml = `
+                    <div class="bg-sky-950/40 border border-sky-500/30 p-4 rounded-2xl space-y-2.5">
+                        <p class="text-xs font-extrabold text-sky-200"><i class="fa-solid fa-building-columns mr-1.5"></i>Pagarás por transferencia</p>
+                        ${(bank || holder || clabe) ? `
+                            ${bank ? `<p class="text-xs text-slate-200"><span class="text-slate-400">Banco:</span> <strong>${escapeHtmlText(bank)}</strong></p>` : ''}
+                            ${holder ? `<p class="text-xs text-slate-200"><span class="text-slate-400">Titular:</span> <strong>${escapeHtmlText(holder)}</strong></p>` : ''}
+                            ${clabe ? `<div class="flex items-center justify-between gap-2">
+                                <p class="text-sm font-mono font-black text-white break-all">${escapeHtmlText(clabe)}</p>
+                                <button onclick="copyBankClabe()" style="min-height:0;padding:0.4rem 0.8rem;font-size:12px" class="shrink-0 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg"><i class="fa-regular fa-copy mr-1"></i>Copiar</button>
+                            </div>` : ''}
+                            <p class="text-xs text-slate-200"><span class="text-slate-400">Monto:</span> <strong class="text-emerald-400">$${total.toFixed(2)} MXN</strong></p>
+                        ` : `<p class="text-xs text-amber-300">Pide a tu mesera los datos para transferir.</p>`}
+                        ${proofBlock}
+                    </div>`;
+            }
+
             const menuOpen = document.getElementById('customer-menu-details')?.open ? 'open' : '';
             const phoneEl = document.getElementById('customer-phone-input');
             const phoneHadFocus = !!phoneEl && document.activeElement === phoneEl;
@@ -4538,6 +4773,8 @@
                         <span class="text-emerald-400 text-lg">$${total.toFixed(2)} MXN</span>
                     </div>
                 </div>
+
+                ${transferCustomerHtml}
 
                 <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-2">
                     <p class="text-xs font-bold text-white"><i class="fa-brands fa-whatsapp text-emerald-400 text-base mr-1.5"></i>¿Quieres tu ticket por WhatsApp?</p>
@@ -4601,6 +4838,59 @@
                         <i class="fa-solid fa-bell-concierge text-sm"></i> LLAMAR A LA MESERA
                    </button>`;
             footer.insertAdjacentHTML('afterbegin', callBtnHtml);
+        }
+
+        function compressImageFile(file, maxDim, quality) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    const c = document.createElement('canvas');
+                    c.width = Math.max(1, Math.round(img.width * scale));
+                    c.height = Math.max(1, Math.round(img.height * scale));
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, c.width, c.height);
+                    ctx.drawImage(img, 0, 0, c.width, c.height);
+                    URL.revokeObjectURL(url);
+                    resolve(c.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagen')); };
+                img.src = url;
+            });
+        }
+
+        async function uploadTransferProof(ev) {
+            const input = ev.target;
+            const file = input.files && input.files[0];
+            input.value = '';
+            if (!file) return;
+            if (!/^image\//.test(file.type)) {
+                showToast('Sube una imagen (captura o foto del comprobante)', 'warning');
+                return;
+            }
+            const table = getCustomerTable();
+            if (!table) return;
+            showToast('Enviando tu comprobante…', 'info');
+            try {
+                let data = await compressImageFile(file, 1000, 0.6);
+                if (data.length > 160000) data = await compressImageFile(file, 800, 0.5);
+                if (data.length > 160000) data = await compressImageFile(file, 640, 0.45);
+                const proof = { image: data, at: new Date().toISOString(), status: 'pending' };
+                if (customerLockedMesaCode) {
+                    await updateTableRemote(table.id, { transferProof: proof });
+                    showToast('¡Listo! Enviamos tu comprobante al restaurante', 'success');
+                    return;
+                }
+                table.transferProof = proof;
+                saveData();
+                refreshAllTableViews();
+                broadcastBillAlert(table.name, table.waiter, 'proof');
+                showToast('Comprobante enviado', 'success');
+            } catch (e) {
+                showToast('No se pudo leer la imagen. Intenta con otra captura.', 'error');
+            }
         }
 
         function saveCustomerPhone() {
