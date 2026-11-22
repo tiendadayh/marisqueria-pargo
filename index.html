@@ -1014,12 +1014,12 @@
         const ADMIN_IDLE_MS = 10 * 60 * 1000;
         const WAITRESS_IDLE_MS = 15 * 60 * 1000;
         const FIREBASE_CONFIG = {
-          apiKey: "AIzaSyA62K0surGjYVvhB9ZTAjzb_h-ML_oDAJE",
-          authDomain: "restaurante-9bb07.firebaseapp.com",
-          projectId: "restaurante-9bb07",
-          storageBucket: "restaurante-9bb07.firebasestorage.app",
-          messagingSenderId: "385838515758",
-          appId: "1:385838515758:web:c1017a8cf896ff9fed81bf"
+          apiKey: "AIzaSyDseU2Tk27KgZuvgy9zT9z4q8k45xPaofI",
+          authDomain: "marisqueria-pargo.firebaseapp.com",
+          projectId: "marisqueria-pargo",
+          storageBucket: "marisqueria-pargo.firebasestorage.app",
+          messagingSenderId: "360792561354",
+          appId: "1:360792561354:web:166bf08abe2c459ebc0633"
         };
         const FIRESTORE_ROOM_DOC = 'marisqueria-pargo';
         const ALERT_CHANNEL_NAME = 'pargo_bill_alerts_v1';
@@ -4096,12 +4096,16 @@
         // --- SINCRONIZACIÓN EN TIEMPO REAL CON FIRESTORE ---
 
         function initFirebaseSync() {
+            if (String(FIREBASE_CONFIG.apiKey).startsWith('PEGA_')) {
+                updateCloudPill('Local', false);
+                return;
+            }
             if (typeof firebase === 'undefined') {
                 updateCloudPill('Local', false);
                 return;
             }
             try {
-                const appName = 'gastropos_restaurante_9bb07';
+                const appName = 'pargo_pos_cloud';
                 const existingApp = firebase.apps.find(a => a.name === appName);
                 const app = existingApp || firebase.initializeApp(FIREBASE_CONFIG, appName);
                 cloudDb = app.firestore();
