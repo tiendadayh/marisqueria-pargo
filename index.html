@@ -913,7 +913,7 @@
     </div>
 
     <!-- MODAL: VER COMPROBANTE DE TRANSFERENCIA -->
-    <div id="modal-proof-view" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div id="modal-proof-view" class="fixed inset-0 z-[70] bg-slate-950/90 backdrop-blur-sm hidden items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-4 shadow-2xl space-y-3">
             <div class="flex justify-between items-center">
                 <h3 class="font-extrabold text-white text-sm"><i class="fa-solid fa-receipt text-sky-400 mr-1.5"></i>Comprobante · <span id="proof-view-table"></span></h3>
@@ -921,6 +921,25 @@
             </div>
             <img id="proof-view-img" src="" alt="Comprobante" class="w-full max-h-[70vh] object-contain rounded-xl bg-white">
             <button onclick="closeModal('modal-proof-view')" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- VENTANITAS DEL CLIENTE -->
+    <div id="modal-customer-transfer" class="fixed inset-0 z-[60] bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-3">
+        <div class="bg-slate-900 border border-sky-500/30 rounded-3xl max-w-md w-full p-4 shadow-2xl flex flex-col gap-3" style="max-height:calc(100dvh - 1.5rem)">
+            <div class="flex justify-between items-center shrink-0">
+                <h3 class="font-extrabold text-white text-sm"><i class="fa-solid fa-building-columns text-sky-400 mr-1.5"></i>Pago por transferencia</h3>
+                <button onclick="closeModal('modal-customer-transfer')" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div id="customer-transfer-popup-body" class="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2"></div>
+            <button onclick="closeModal('modal-customer-transfer')" class="shrink-0 w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl">Cerrar</button>
+        </div>
+    </div>
+    <div id="modal-customer-added" class="fixed inset-0 z-[60] bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-3">
+        <div class="bg-slate-900 border border-emerald-500/30 rounded-3xl max-w-sm w-full p-4 shadow-2xl flex flex-col gap-3" style="max-height:calc(100dvh - 1.5rem)">
+            <h3 class="font-extrabold text-white text-sm shrink-0"><i class="fa-solid fa-circle-plus text-emerald-400 mr-1.5"></i>Se agregó a tu cuenta</h3>
+            <div id="customer-added-body" class="flex-1 min-h-0 overflow-y-auto space-y-1.5"></div>
+            <button onclick="closeModal('modal-customer-added')" class="shrink-0 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl">Entendido</button>
         </div>
     </div>
 
@@ -4726,7 +4745,7 @@
                     proofBlock = `
                         <div class="bg-amber-500/15 border border-amber-500/40 rounded-2xl p-3 space-y-2">
                             <p class="text-xs font-bold text-amber-200"><i class="fa-solid fa-hourglass-half mr-1.5"></i>Comprobante enviado. Esperando confirmación del restaurante…</p>
-                            ${tp && tp.image ? `<img src="${tp.image}" alt="Tu comprobante" class="w-full max-h-40 object-contain rounded-xl bg-white">` : ''}
+                            ${tp && tp.image ? `<img src="${tp.image}" onclick="openCustomerProof()" alt="Tu comprobante" class="w-full max-h-40 object-contain rounded-xl bg-white cursor-zoom-in">` : ''}
                         </div>
                         ${uploadBtn('Cambiar comprobante')}`;
                 } else {
@@ -4750,6 +4769,8 @@
                         ${proofBlock}
                     </div>`;
             }
+
+            syncCustomerPopups(table, transferCustomerHtml);
 
             const menuOpen = document.getElementById('customer-menu-details')?.open ? 'open' : '';
             const phoneEl = document.getElementById('customer-phone-input');
@@ -4838,6 +4859,60 @@
                         <i class="fa-solid fa-bell-concierge text-sm"></i> LLAMAR A LA MESERA
                    </button>`;
             footer.insertAdjacentHTML('afterbegin', callBtnHtml);
+        }
+
+        let customerPrevItems = null;
+        let customerPrevTableId = null;
+        let customerTransferPopupFor = null;
+        let customerAddedTimer = null;
+
+        function openCustomerProof() {
+            const t = getCustomerTable();
+            if (!t || !t.transferProof || !t.transferProof.image) return;
+            document.getElementById('proof-view-table').textContent = 'tu comprobante';
+            document.getElementById('proof-view-img').src = t.transferProof.image;
+            openModal('modal-proof-view');
+        }
+
+        // Ventanitas del cliente: datos de transferencia y platillos recién agregados
+        function syncCustomerPopups(table, transferHtml) {
+            const tm = document.getElementById('modal-customer-transfer');
+            const body = document.getElementById('customer-transfer-popup-body');
+            if (tm && body) {
+                if (transferHtml) {
+                    body.innerHTML = transferHtml;
+                    if (customerTransferPopupFor !== table.id) {
+                        customerTransferPopupFor = table.id;
+                        openModal('modal-customer-transfer');
+                    }
+                } else {
+                    customerTransferPopupFor = null;
+                    closeModal('modal-customer-transfer');
+                    body.innerHTML = '';
+                }
+            }
+
+            // Platillos que se agregaron desde la última vez que se vio la mesa
+            const snap = {};
+            table.items.forEach(i => { const k = i.sku || i.name; snap[k] = { name: i.name, qty: i.qty }; });
+            if (customerPrevTableId === table.id && customerPrevItems) {
+                const added = [];
+                Object.keys(snap).forEach(k => {
+                    const before = customerPrevItems[k] ? customerPrevItems[k].qty : 0;
+                    if (snap[k].qty > before) added.push(`${snap[k].qty - before} × ${snap[k].name}`);
+                });
+                if (added.length) {
+                    const ab = document.getElementById('customer-added-body');
+                    if (ab) {
+                        ab.innerHTML = added.map(a => `<div class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white">${escapeHtmlText(a)}</div>`).join('');
+                        openModal('modal-customer-added');
+                        clearTimeout(customerAddedTimer);
+                        customerAddedTimer = setTimeout(() => closeModal('modal-customer-added'), 8000);
+                    }
+                }
+            }
+            customerPrevTableId = table.id;
+            customerPrevItems = snap;
         }
 
         function compressImageFile(file, maxDim, quality) {
