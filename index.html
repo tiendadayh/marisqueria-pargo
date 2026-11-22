@@ -800,7 +800,8 @@
             <!-- Hoja del Ticket para PDF -->
             <div id="ticket-printable-box" class="bg-white text-slate-900 rounded-2xl overflow-hidden shadow-inner text-xs" style="font-family: 'Segoe UI', Roboto, Arial, sans-serif;">
                 <div class="bg-slate-900 text-white text-center px-5 pt-5 pb-4">
-                    <div class="w-11 h-11 mx-auto rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-lg mb-2"><i class="fa-solid fa-utensils"></i></div>
+                    <div id="ticket-logo-wrap" class="hidden inline-block bg-white rounded-2xl p-1.5 mb-2"><img id="ticket-logo" src="" alt="Logo" style="height:64px;width:auto;max-width:200px;display:block;border-radius:10px;"></div>
+                    <div id="ticket-logo-fallback" class="w-11 h-11 mx-auto rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-lg mb-2"><i class="fa-solid fa-utensils"></i></div>
                     <h4 class="font-black text-lg uppercase tracking-wide leading-tight" id="ticket-business-name">GASTROPOS RESTAURANTE</h4>
                     <p class="text-[10px] font-bold tracking-[0.25em] text-amber-300 uppercase mt-1" id="ticket-doc-type">Ticket de consumo</p>
                 </div>
@@ -847,8 +848,10 @@
                 <label class="block text-xs text-slate-300 font-semibold"><i class="fa-brands fa-whatsapp text-emerald-400 mr-1"></i>WhatsApp del cliente</label>
                 <div class="flex gap-2">
                     <input type="tel" id="ticket-phone-input" inputmode="tel" placeholder="10 dígitos, ej. 744 123 4567" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white text-xs focus:outline-none focus:border-emerald-500">
-                    <button onclick="sendTicketWhatsApp()" class="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5"><i class="fa-brands fa-whatsapp text-base"></i> Enviar</button>
+                    <button onclick="sendTicketWhatsApp()" class="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5"><i class="fa-brands fa-whatsapp text-base"></i> Texto</button>
                 </div>
+                <button onclick="sendTicketPdfWhatsApp()" id="btn-send-ticket-pdf" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-md"><i class="fa-solid fa-file-pdf text-sm"></i> ENVIAR TICKET EN PDF</button>
+                <p class="text-[10px] text-slate-500 leading-snug">En el celular se abre el menú de compartir (elige WhatsApp y el contacto). En computadora se descarga el PDF y se abre el chat para que lo adjuntes.</p>
             </div>
 
             <div class="flex gap-2">
@@ -1307,6 +1310,41 @@
 
         document.addEventListener('pointerdown', unlockAudioContextOnce, { passive: true });
         document.addEventListener('keydown', unlockAudioContextOnce, { passive: true });
+
+        // --- SONIDOS DE INTERFAZ (agregar, quitar, error, confirmar). Se silencian con el botón "Alertas" ---
+        function playUiSound(kind) {
+            if (!storeConfig.soundAlerts) return;
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                if (!audioCtxInstance) audioCtxInstance = new AudioCtx();
+                const ctx = audioCtxInstance;
+                if (ctx.state === 'suspended') ctx.resume();
+                const t0 = ctx.currentTime;
+                const patterns = {
+                    add: [{ f: 660, d: 0.07, t: 0 }, { f: 990, d: 0.11, t: 0.06 }],
+                    remove: [{ f: 520, d: 0.07, t: 0 }, { f: 340, d: 0.13, t: 0.06 }],
+                    deny: [{ f: 200, d: 0.12, t: 0 }, { f: 160, d: 0.17, t: 0.11 }],
+                    tick: [{ f: 780, d: 0.04, t: 0 }],
+                    confirm: [{ f: 523.25, d: 0.09, t: 0 }, { f: 659.25, d: 0.09, t: 0.09 }, { f: 783.99, d: 0.2, t: 0.18 }]
+                };
+                const notes = patterns[kind];
+                if (!notes) return;
+                notes.forEach(n => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = kind === 'deny' ? 'square' : 'sine';
+                    osc.frequency.setValueAtTime(n.f, t0 + n.t);
+                    gain.gain.setValueAtTime(0.0001, t0 + n.t);
+                    gain.gain.exponentialRampToValueAtTime(kind === 'deny' ? 0.07 : 0.18, t0 + n.t + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + n.t + n.d);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(t0 + n.t);
+                    osc.stop(t0 + n.t + n.d + 0.02);
+                });
+            } catch (e) {}
+        }
 
         function saveData(skipCloud = false) {
             localStorage.setItem('pargo_pro_v3_tables', JSON.stringify(tables));
@@ -2008,6 +2046,16 @@
             const total = Number(d.total || 0);
             const count = items.reduce((sum, i) => sum + (i.qty || 0), 0);
 
+            const _brandImg = document.getElementById('brand-logo');
+            const _logoWrap = document.getElementById('ticket-logo-wrap');
+            const _logoFb = document.getElementById('ticket-logo-fallback');
+            if (_brandImg && _brandImg.src && _logoWrap) {
+                document.getElementById('ticket-logo').src = _brandImg.src;
+                _logoWrap.classList.remove('hidden');
+                if (_logoFb) _logoFb.classList.add('hidden');
+            } else if (_logoFb) {
+                _logoFb.classList.remove('hidden');
+            }
             document.getElementById('ticket-business-name').textContent = String(d.businessName).toUpperCase();
             document.getElementById('ticket-doc-type').textContent = isSale ? 'Ticket de venta' : 'Cuenta · Ticket de consumo';
 
@@ -2073,6 +2121,7 @@
             renderTicketSheet(currentTicketData);
             document.getElementById('ticket-phone-input').value = table.customerPhone ? formatPhoneDisplay(table.customerPhone) : '';
             openModal('modal-ticket-receipt');
+            scheduleTicketPdfPrefetch();
         }
 
         function openTicketModalForSale(folio) {
@@ -2091,6 +2140,7 @@
             renderTicketSheet(currentTicketData);
             document.getElementById('ticket-phone-input').value = sale.phone ? formatPhoneDisplay(sale.phone) : '';
             openModal('modal-ticket-receipt');
+            scheduleTicketPdfPrefetch();
         }
 
         function sendTicketWhatsApp() {
@@ -2140,6 +2190,116 @@
             lines.push('¡Gracias por su visita! 🙏');
 
             window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
+        }
+
+        // --- ENVIAR EL TICKET EN PDF POR WHATSAPP ---
+        let ticketPdfPromise = null;
+
+        function ticketPdfSettings() {
+            const box = document.getElementById('ticket-printable-box');
+            const safeName = (storeConfig.businessName || 'Ticket').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const fileName = `Ticket_${safeName}_${Date.now()}.pdf`;
+            const pageW = 100, margin = 5;
+            const pageH = Math.ceil(box.offsetHeight * ((pageW - margin * 2) / box.offsetWidth)) + margin * 2 + 6;
+            return {
+                box, fileName,
+                opt: {
+                    margin: [margin, margin, margin, margin],
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: [pageW, pageH], orientation: 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                }
+            };
+        }
+
+        async function makeTicketPdfBlob() {
+            if (typeof html2pdf === 'undefined') throw new Error('Sin generador de PDF');
+            const { box, fileName, opt } = ticketPdfSettings();
+            const blob = await html2pdf().set(opt).from(box).outputPdf('blob');
+            return { blob, fileName };
+        }
+
+        // Se prepara el PDF mientras la mesera revisa el ticket, para que al tocar "Enviar" salga al instante
+        function scheduleTicketPdfPrefetch() {
+            ticketPdfPromise = null;
+            setTimeout(() => {
+                const modal = document.getElementById('modal-ticket-receipt');
+                if (!modal || modal.classList.contains('hidden')) return;
+                ticketPdfPromise = makeTicketPdfBlob().catch(() => null);
+            }, 500);
+        }
+
+        function persistTicketPhone(phone) {
+            const d = currentTicketData;
+            if (!d || !phone) return;
+            if (d.saleFolio) {
+                const sale = salesHistory.find(x => x.id === d.saleFolio);
+                if (sale && sale.phone !== phone) {
+                    sale.phone = phone;
+                    saveData();
+                    renderAdminReports();
+                }
+            } else if (d.tableId) {
+                const t = tables.find(x => x.id === d.tableId);
+                if (t && t.customerPhone !== phone) {
+                    t.customerPhone = phone;
+                    saveData();
+                    refreshAllTableViews();
+                }
+            }
+        }
+
+        async function sendTicketPdfWhatsApp() {
+            if (!currentTicketData) return;
+            const btn = document.getElementById('btn-send-ticket-pdf');
+            const d = currentTicketData;
+            const phone = normalizePhone(document.getElementById('ticket-phone-input').value);
+            if (phone) persistTicketPhone(phone);
+
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-sm"></i> PREPARANDO PDF...';
+            try {
+                let res = ticketPdfPromise ? await ticketPdfPromise : null;
+                if (!res) res = await makeTicketPdfBlob();
+                const file = new File([res.blob], res.fileName, { type: 'application/pdf' });
+                const caption = `🧾 Ticket de ${d.businessName} · ${d.tableName}\nTotal: ${formatTicketMoney(d.total)} MXN\n¡Gracias por su visita! 🙏`;
+
+                // Celular: menú de compartir con el PDF adjunto
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({ files: [file], title: `Ticket ${d.businessName}`, text: caption });
+                        showToast('Ticket compartido', 'success');
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                    }
+                }
+
+                // Computadora: se descarga el PDF y se abre el chat del cliente para adjuntarlo
+                const url = URL.createObjectURL(res.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = res.fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+                if (phone) {
+                    const w = window.open(`https://wa.me/${phone}?text=${encodeURIComponent(caption + '\n\n📎 Te adjunto el ticket en PDF.')}`, '_blank');
+                    showToast(w ? 'PDF descargado: adjúntalo en el chat de WhatsApp que se abrió' : 'PDF descargado. Toca "Texto" para abrir el chat y adjúntalo', 'info');
+                } else {
+                    showToast('PDF descargado. Escribe el WhatsApp del cliente para abrir su chat', 'info');
+                }
+            } catch (e) {
+                showToast('No se pudo preparar el PDF del ticket', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
         }
 
         async function downloadTicketPDF() {
@@ -2459,6 +2619,32 @@
             }
         }
 
+        // --- CATÁLOGO RÁPIDO POR CATEGORÍA (pantalla de mesera) ---
+        let waitressCatFilter = 'all';
+        function waitressActiveCat() {
+            return (waitressCatFilter !== 'all' && catalog.some(p => p.category === waitressCatFilter)) ? waitressCatFilter : 'all';
+        }
+        function waitressCatMatches(p) {
+            const c = waitressActiveCat();
+            return c === 'all' || p.category === c;
+        }
+        function setWaitressCatFilter(key) {
+            playUiSound('tick');
+            waitressCatFilter = key;
+            renderWaitressOrderPanel();
+            const el = document.getElementById('waitress-catalog-scroll');
+            if (el) el.scrollTop = 0;
+        }
+        function waitressCategoryChipsHtml() {
+            const active = waitressActiveCat();
+            const chip = (key, label, count) => `<button type="button" onclick="setWaitressCatFilter('${key}')" ${active === key ? 'data-cat-active="1"' : ''} class="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border whitespace-nowrap transition-all ${active === key ? 'bg-orange-500 text-slate-950 border-orange-400' : 'bg-slate-950 text-slate-300 border-slate-700 hover:border-orange-500'}">${label} <span class="opacity-70">${count}</span></button>`;
+            const cats = MENU_CATEGORIES.filter(c => catalog.some(p => p.category === c.key));
+            return `<div class="sticky top-0 z-10 py-1.5 bg-slate-900/95 flex gap-1.5 overflow-x-auto">`
+                + chip('all', 'Todos', catalog.length)
+                + cats.map(c => chip(c.key, c.emoji + ' ' + c.label, catalog.filter(p => p.category === c.key).length)).join('')
+                + `</div>`;
+        }
+
         function renderWaitressOrderPanel() {
             const container = document.getElementById('waitress-order-panel');
             if (activeWaitressTableId !== null) {
@@ -2550,8 +2736,9 @@
 
                     <div id="waitress-catalog-scroll" class="space-y-2 pt-2 border-t border-slate-800 flex-1 min-h-[220px] overflow-y-auto pr-1">
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Catálogo Rápido</p>
+                        ${waitressCategoryChipsHtml()}
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            ${catalog.map(prod => {
+                            ${catalog.filter(waitressCatMatches).map(prod => {
                                 const available = isItemAvailable(prod);
                                 return `
                                     <div title="${(prod.desc || '').replace(/"/g, '&quot;')}" onclick="addProductSKUToActiveTable('${prod.sku}')" class="bg-slate-950 ${available ? 'hover:border-orange-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'} border border-slate-800 p-2 rounded-xl flex items-center gap-2 transition-all">
@@ -2595,6 +2782,8 @@
 
             container.dataset.tableId = String(activeWaitressTableId);
             container.dataset.itemCount = String(table.items.length);
+            const _activeChip = container.querySelector('[data-cat-active="1"]');
+            if (_activeChip && _activeChip.parentElement) _activeChip.parentElement.scrollLeft = Math.max(0, _activeChip.offsetLeft - _activeChip.parentElement.clientWidth / 2 + _activeChip.clientWidth / 2);
             if (savedScroll) {
                 const setTop = (id, v) => { const el = document.getElementById(id); if (el) el.scrollTop = v; };
                 setTop('waitress-outer-scroll', savedScroll.outer);
@@ -2669,6 +2858,7 @@
             saveData();
             closeModal('modal-confirm-order');
             refreshAllTableViews();
+            playUiSound('confirm');
             showToast('Pedido confirmado y guardado 🔒', 'success');
         }
 
@@ -2760,6 +2950,7 @@
             if (newQty <= 0) { adminRemoveItem(sku); return; }
             const confirmed = getConfirmedQty(item);
             item.qty = newQty;
+            playUiSound(delta > 0 ? 'add' : 'remove');
             // Lo que el admin agrega queda confirmado; si baja, primero se descuenta lo pendiente
             item.confirmedQty = delta > 0 ? confirmed + delta : Math.min(confirmed, newQty);
             logTableCorrection(table, `Admin: ${item.name} ${oldQty} → ${newQty}`);
@@ -2773,6 +2964,7 @@
             if (!item) return;
             if (!confirm(`¿Quitar "${item.name}" (${item.qty}) de la cuenta de ${table.name}?`)) return;
             table.items = table.items.filter(i => i.sku !== sku);
+            playUiSound('remove');
             logTableCorrection(table, `Admin: se quitó ${item.qty} × ${item.name}`);
             adminCorrectCommit();
         }
@@ -2804,6 +2996,7 @@
             } else {
                 table.items.push({ sku: prod.sku, name: prod.name, price: prod.price, image: prod.image, notes: '', qty: 1, confirmedQty: 1 });
             }
+            playUiSound('add');
             logTableCorrection(table, `Admin: se agregó 1 × ${prod.name}`);
             adminCorrectCommit();
         }
@@ -2819,6 +3012,7 @@
             }
 
             if (!isItemAvailable(prod)) {
+                playUiSound('deny');
                 showToast(`"${prod.name}" está marcado como AGOTADO hoy`, 'warning');
                 return;
             }
@@ -2839,6 +3033,7 @@
 
             saveData();
             refreshAllTableViews();
+            playUiSound('add');
             showToast(`+1 ${prod.name} agregado`, 'success');
         }
 
@@ -2848,10 +3043,12 @@
             const item = table.items.find(i => i.sku === sku);
             if (item) {
                 if (delta < 0 && item.qty + delta < getConfirmedQty(item)) {
+                    playUiSound('deny');
                     showToast('Ese producto ya está confirmado 🔒. Para quitarlo usa el candado (pide contraseña de admin).', 'warning');
                     return;
                 }
                 item.qty += delta;
+                playUiSound(delta > 0 ? 'add' : 'remove');
                 if (item.qty <= 0) {
                     table.items = table.items.filter(i => i.sku !== sku);
                 }
