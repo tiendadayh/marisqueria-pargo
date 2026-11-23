@@ -273,7 +273,7 @@
                         <span id="waitress-active-tables-badge" class="bg-slate-800 px-2 py-0.5 rounded-full text-slate-300">0 activas</span>
                     </div>
 
-                    <div id="waitress-tables-list" class="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                    <div id="waitress-tables-list" class="grid grid-cols-2 gap-3">
                     </div>
                 </div>
             </div>
@@ -295,9 +295,6 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <div id="kitchen-counters" class="flex flex-wrap gap-2 text-[11px] font-black"></div>
-                    <button onclick="copyKitchenLink()" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 whitespace-nowrap">
-                        <i class="fa-regular fa-copy mr-1"></i> Enlace de pantalla de cocina
-                    </button>
                 </div>
             </div>
             <div class="flex-1 overflow-y-auto p-3 md:p-4">
@@ -334,12 +331,12 @@
                     </button>
                 </div>
 
-                <button onclick="copyKitchenLink('cocina')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Copiar el enlace de la pantalla de cocina">
-                    <i class="fa-regular fa-copy"></i><span class="hidden sm:inline">Enlace cocina</span>
+                <button onclick="copyKitchenLink('cocina')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-950/50 hover:bg-orange-900/60 text-orange-300 border border-orange-500/30 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Copiar el enlace de la pantalla de cocina">
+                    <i class="fa-solid fa-fire-burner"></i><span>Copiar enlace Cocina</span>
                 </button>
 
-                <button onclick="copyWaiterLink()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Copiar el enlace de la pantalla de meseras">
-                    <i class="fa-regular fa-copy"></i><span class="hidden sm:inline">Enlace mesera</span>
+                <button onclick="copyWaiterLink()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-950/50 hover:bg-sky-900/60 text-sky-300 border border-sky-500/30 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Copiar el enlace de la pantalla de meseras">
+                    <i class="fa-solid fa-user-tie"></i><span>Copiar enlace Mesera</span>
                 </button>
 
                 <button onclick="openAdminAuthModal('change')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-amber-950/60 text-amber-400 border border-slate-700 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Cambiar PIN de administrador">
@@ -382,7 +379,7 @@
                             </button>
                         </div>
 
-                        <div id="admin-tables-crud-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div id="admin-tables-crud-list" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                         </div>
                     </div>
                 </div>
@@ -1023,6 +1020,33 @@
             <h3 class="font-extrabold text-white text-sm shrink-0"><i class="fa-solid fa-circle-plus text-emerald-400 mr-1.5"></i>Se agregó a tu cuenta</h3>
             <div id="customer-added-body" class="flex-1 min-h-0 overflow-y-auto space-y-1.5"></div>
             <button onclick="closeModal('modal-customer-added')" class="shrink-0 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl">Entendido</button>
+        </div>
+    </div>
+
+    <!-- MODAL: MENÚ COMPLETO PARA LA MESERA -->
+    <div id="modal-waiter-menu" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm hidden items-end sm:items-center justify-center sm:p-4">
+        <div class="bg-slate-900 border border-slate-700 sm:rounded-3xl w-full max-w-3xl h-full sm:h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="shrink-0 p-3 space-y-2 border-b border-slate-800" style="background:linear-gradient(135deg,rgba(249,115,22,.16),rgba(6,24,42,.95) 60%)">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <h3 class="font-black text-white text-base truncate"><i class="fa-solid fa-book-open text-orange-400 mr-1.5"></i>Menú</h3>
+                        <p id="wm-table-name" class="text-[11px] text-slate-400 truncate"></p>
+                    </div>
+                    <button onclick="closeWaiterMenuModal()" class="shrink-0 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"><i class="fa-solid fa-xmark mr-1"></i>Cerrar</button>
+                </div>
+                <div id="wm-numsearch"></div>
+                <div id="wm-chips"></div>
+            </div>
+            <div id="wm-scroll" class="flex-1 min-h-0 overflow-y-auto p-3">
+                <div id="wm-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+            </div>
+            <div class="shrink-0 p-3 bg-slate-950 border-t border-slate-800 flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                    <p id="wm-summary" class="text-xs font-bold text-slate-300 truncate"></p>
+                    <p id="wm-total" class="text-lg font-black text-emerald-400 leading-tight"></p>
+                </div>
+                <button onclick="closeWaiterMenuModal()" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-sm shadow-lg"><i class="fa-solid fa-check mr-1.5"></i>LISTO</button>
+            </div>
         </div>
     </div>
 
@@ -1914,6 +1938,7 @@
             if (_co && !_co.classList.contains('hidden') && pendingCheckoutTableId) renderTransferInfo();
             renderWaitressTablesList();
             renderWaitressOrderPanel();
+            renderWaiterMenuModal();
             renderPayingTablesBanner();
             renderAdminLiveMonitor();
             renderAdminTables();
@@ -3182,6 +3207,17 @@
             const activeCount = visibleTables.filter(t => t.status !== 'free').length;
             badge.textContent = `${activeCount} activas`;
 
+            { let sum = document.getElementById('waitress-live-summary');
+              if (!sum) { sum = document.createElement('div'); sum.id = 'waitress-live-summary'; sum.className = 'grid grid-cols-3 gap-2'; container.insertAdjacentElement('beforebegin', sum); }
+              if (!currentWaitressSession && !isAdminUnlocked) { sum.innerHTML = ''; }
+              else {
+                const nFree = visibleTables.filter(t => t.status === 'free').length;
+                const nMine = visibleTables.filter(t => t.status !== 'free').length;
+                const nPay = visibleTables.filter(t => t.status === 'paying' || t.calling || tableKitchenState(t) === 'ready').length;
+                const st = (label, val, col) => `<div class="mon-stat text-center" style="padding:.5rem .4rem"><p class="text-[9px] uppercase tracking-wider font-bold text-slate-500">${label}</p><p class="text-lg font-black ${col}">${val}</p></div>`;
+                sum.innerHTML = st('Libres', nFree, 'text-emerald-400') + st('Atendiendo', nMine, 'text-amber-400') + st('Avisos', nPay, nPay ? 'text-purple-400 animate-pulse' : 'text-slate-500');
+              } }
+
             if (!currentWaitressSession && !isAdminUnlocked) {
                 container.innerHTML = '<div class="col-span-2 lg:col-span-1 p-4 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-400"><i class="fa-solid fa-lock text-orange-400 text-base mb-1.5 block"></i>Inicia sesión con tu PIN para ver y atender tus mesas.</div>';
                 return;
@@ -3204,22 +3240,32 @@
                 { const _ks = tableKitchenState(table);
                   if (_ks === 'ready') statusBadge += ' <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500 text-slate-950 animate-pulse">🍽️ Listo</span>';
                   else if (_ks) statusBadge += ' <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">👨‍🍳 Cocina</span>'; }
+                const stCls = table.status === 'occupied' ? 'mon-occ' : (table.status === 'paying' ? 'mon-pay-st' : 'mon-free');
+                const mins = table.openedAt ? Math.max(0, Math.floor((Date.now() - new Date(table.openedAt).getTime()) / 60000)) : null;
+                const elapsed = mins === null ? '' : (mins >= 60 ? `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')} min` : `${mins} min`);
+                const seats = Math.min(10, Math.max(4, table.guests || 0));
+                const filled = Math.min(table.guests || 0, seats);
+                const chairs = Array.from({ length: seats }, (_, ci) => `<span class="mesa-chair ${ci < filled ? 'on' : ''}" style="transform:translate(-50%,-50%) rotate(${(ci * 360 / seats).toFixed(1)}deg) translateY(-62px)"></span>`).join('');
+                const alertCls = (table.calling || tableKitchenState(table) === 'ready') ? 'mesa-alert' : '';
+
                 const item = document.createElement('div');
-                item.className = `p-3 rounded-xl border transition-all cursor-pointer flex flex-col lg:flex-row lg:items-center lg:justify-between gap-1 ${isSelected ? 'bg-orange-600/20 border-orange-500' : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'}`;
-                
+                item.className = `mon-card ${stCls} p-2.5 cursor-pointer`;
+                if (isSelected) item.style.cssText = 'outline:2px solid #fb923c;outline-offset:2px;';
+
                 item.innerHTML = `
-                    <div>
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            <h4 class="font-bold text-white text-sm">${table.name}</h4>
-                            ${statusBadge}
+                    <div style="height:108px">
+                        <div class="mesa-viz ${alertCls}" style="transform:scale(.72);transform-origin:top center;margin-top:0">
+                            ${chairs}
+                            <div class="mesa-top"><span class="mesa-name">${table.name}</span><span class="mesa-amt">${table.status === 'free' ? 'Libre' : '$' + subtotal.toFixed(0)}</span></div>
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-0.5">
-                            ${table.status !== 'free' ? `${table.guests} pers. | Mesera: ${table.waiter}` : 'Mesa lista para abrir'}
-                        </p>
                     </div>
-                    <div class="text-left lg:text-right">
-                        <span class="text-sm font-black ${table.status !== 'free' ? 'text-emerald-400' : 'text-slate-600'}">$${subtotal.toFixed(2)}</span>
-                    </div>
+                    <div class="mt-1 flex flex-wrap justify-center gap-1">${statusBadge}</div>
+                    <p class="text-center text-[11px] text-slate-400 mt-1.5 leading-tight">
+                        ${table.status !== 'free'
+                            ? `<i class="fa-solid fa-users mr-1 text-slate-500"></i>${table.guests} pers.${elapsed ? ` · <i class="fa-regular fa-clock mr-0.5 text-slate-500"></i>${elapsed}` : ''}`
+                            : '<span class="text-slate-500">Toca para abrir mesa</span>'}
+                    </p>
+                    ${table.status !== 'free' ? `<p class="text-center text-[10px] text-orange-400 font-bold mt-0.5 truncate"><i class="fa-solid fa-user-tie mr-1"></i>${table.waiter || '—'}</p>` : ''}
                 `;
 
                 item.onclick = () => selectWaitressTable(table.id);
@@ -3289,8 +3335,8 @@
         function setWaitressCatFilter(key) {
             playUiSound('tick');
             waitressCatFilter = key;
-            renderWaitressOrderPanel();
-            const el = document.getElementById('waitress-catalog-scroll');
+            renderWaiterMenuModal();
+            const el = document.getElementById('wm-scroll');
             if (el) el.scrollTop = 0;
         }
         function waitressCategoryChipsHtml() {
@@ -3301,6 +3347,69 @@
                 + chip('all', 'Todos', catalog.length)
                 + cats.map(c => chip(c.key, c.emoji + ' ' + c.label, catalog.filter(p => p.category === c.key).length)).join('')
                 + `</div>`;
+        }
+
+        // --- MENÚ COMPLETO (modal) PARA AGREGAR PLATILLOS ---
+        function waiterMenuOpen() {
+            const m = document.getElementById('modal-waiter-menu');
+            return !!m && !m.classList.contains('hidden');
+        }
+        function openWaiterMenuModal() {
+            if (!activeWaitressTableId) { showToast('Primero selecciona una mesa', 'warning'); return; }
+            playUiSound('tick');
+            document.getElementById('wm-numsearch').innerHTML = waitressNumSearchHtml();
+            openModal('modal-waiter-menu');
+            renderWaiterMenuModal();
+            const sc = document.getElementById('wm-scroll'); if (sc) sc.scrollTop = 0;
+        }
+        function closeWaiterMenuModal() {
+            closeModal('modal-waiter-menu');
+            renderWaitressOrderPanel();
+        }
+        function wmChangeQty(sku, delta) {
+            if (delta > 0) addProductSKUToActiveTable(sku); else changeWaitressItemQty(sku, -1);
+        }
+        function renderWaiterMenuModal() {
+            if (!waiterMenuOpen()) return;
+            const table = tables.find(t => t.id === activeWaitressTableId);
+            if (!table) { closeModal('modal-waiter-menu'); return; }
+            const grid = document.getElementById('wm-grid');
+            const sc = document.getElementById('wm-scroll');
+            const top = sc ? sc.scrollTop : 0;
+            document.getElementById('wm-table-name').textContent = (table.name || ('Mesa ' + table.id)) + ' · toca un platillo para agregarlo';
+            const inp = document.getElementById('waitress-num-input');
+            if (inp && !waitressNumDraft && inp.value) { inp.value = ''; onWaitressNumInput(''); }
+            document.getElementById('wm-chips').innerHTML = waitressCategoryChipsHtml();
+            const chip = document.querySelector('#wm-chips [data-cat-active="1"]');
+            if (chip && chip.parentElement) chip.parentElement.scrollLeft = Math.max(0, chip.offsetLeft - chip.parentElement.clientWidth / 2 + chip.clientWidth / 2);
+            grid.innerHTML = catalogByNumber().filter(waitressCatMatches).map(prod => {
+                const available = isItemAvailable(prod);
+                const it = table.items.find(i => i.sku === prod.sku);
+                const q = it ? it.qty : 0;
+                const canMinus = it && it.qty > getConfirmedQty(it);
+                const img = `<div class="relative"><img src="${prod.image}" class="w-full h-24 object-cover ${available ? '' : 'grayscale opacity-60'}" onerror="this.src='https://placehold.co/300x200/1e293b/fff?text=Platillo'">
+                        <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
+                        ${q > 0 ? `<div class="absolute top-1.5 right-1.5 min-w-[1.75rem] h-7 px-1.5 rounded-full bg-orange-500 text-slate-950 text-sm font-black flex items-center justify-center shadow-lg">${q}</div>` : ''}
+                        ${available ? '' : '<div class="absolute inset-0 flex items-center justify-center"><span class="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-rose-600 text-white">AGOTADO</span></div>'}</div>`;
+                const body = `<div class="p-2.5 space-y-1.5">
+                        <p class="text-xs font-bold text-white leading-tight line-clamp-2 min-h-[2rem]">${escapeHtmlText(prod.name)}</p>
+                        <p class="text-sm font-black text-emerald-400">$${prod.price.toFixed(2)}</p>
+                        ${available ? (q > 0
+                            ? `<div class="flex items-center justify-between bg-slate-900 border border-orange-500/40 rounded-xl overflow-hidden">
+                                    <button onclick="event.stopPropagation();wmChangeQty('${prod.sku}',-1)" class="w-11 h-10 text-lg font-black ${canMinus ? 'text-white' : 'text-slate-600'}">−</button>
+                                    <span class="text-sm font-black text-orange-300">${q}</span>
+                                    <button onclick="event.stopPropagation();wmChangeQty('${prod.sku}',1)" class="w-11 h-10 text-lg font-black text-orange-400">+</button>
+                               </div>`
+                            : `<button onclick="event.stopPropagation();wmChangeQty('${prod.sku}',1)" class="w-full h-10 rounded-xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-black text-xs"><i class="fa-solid fa-plus mr-1"></i>AGREGAR</button>`)
+                          : ''}
+                    </div>`;
+                return `<div class="bg-slate-950 border ${q > 0 ? 'border-orange-500/60' : 'border-slate-800'} rounded-2xl overflow-hidden shadow-md ${available ? '' : 'opacity-70'}">${img}${body}</div>`;
+            }).join('') || '<p class="col-span-full text-center text-slate-500 text-sm py-10">No hay platillos en esta categoría</p>';
+            const count = table.items.reduce((s, i) => s + i.qty, 0);
+            const total = table.items.reduce((s, i) => s + i.price * i.qty, 0);
+            document.getElementById('wm-summary').textContent = count === 0 ? 'Aún no hay platillos' : `${count} platillo${count > 1 ? 's' : ''} en la comanda`;
+            document.getElementById('wm-total').textContent = '$' + total.toFixed(2) + ' MXN';
+            if (sc) sc.scrollTop = top;
         }
 
         function waiterTransferStatusHtml(table) {
@@ -3325,7 +3434,7 @@
             const keepScroll = (id) => { const el = document.getElementById(id); return el ? el.scrollTop : 0; };
             const sameTable = container.dataset.tableId === String(activeWaitressTableId);
             const savedScroll = sameTable
-                ? { outer: keepScroll('waitress-outer-scroll'), comanda: keepScroll('waitress-comanda-scroll'), catalog: keepScroll('waitress-catalog-scroll') }
+                ? { outer: keepScroll('waitress-outer-scroll'), comanda: keepScroll('waitress-comanda-scroll') }
                 : null;
             const prevItemCount = sameTable ? parseInt(container.dataset.itemCount || '0') : 0;
 
@@ -3351,7 +3460,7 @@
                 itemsListHtml = `
                     <div class="py-8 text-center text-slate-500">
                         <i class="fa-solid fa-basket-shopping text-3xl mb-2 text-slate-700"></i>
-                        <p class="text-xs font-medium">La comanda está vacía. Toca un producto del catálogo para agregarlo.</p>
+                        <p class="text-xs font-medium">La comanda está vacía. Toca «VER MENÚ / AGREGAR» para elegir lo que pide el cliente.</p>
                         <p class="text-[11px] text-slate-600 mt-1">Si los clientes se retiraron sin pedir, puedes liberar la mesa abajo.</p>
                     </div>
                 `;
@@ -3368,12 +3477,12 @@
             const _hadNumFocus = waitressNumRefocus || (document.activeElement && document.activeElement.id === 'waitress-num-input');
             waitressNumRefocus = false;
             container.innerHTML = `
-                <div class="p-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2" style="background:linear-gradient(135deg,rgba(249,115,22,.14),rgba(6,24,42,.95) 55%);border-bottom:2px solid rgba(249,115,22,.45)">
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="font-extrabold text-white text-base">${table.name}</h3>
                             <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-xs font-medium">${table.guests} personas</span>
-                            <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-xs font-black">$${subtotal.toFixed(2)}</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-sm font-black border border-emerald-500/30">$${subtotal.toFixed(2)}</span>
                             ${table.status === 'paying' ? '<span class="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold">Cuenta pedida</span>' : ''}
                         </div>
                         <p class="text-xs text-orange-400 font-semibold">Mesera: ${table.waiter}</p>
@@ -3406,36 +3515,17 @@
 
                     ${waiterKitchenStripHtml(table)}
 
-                    <div id="waitress-comanda-scroll" class="space-y-2 shrink-0 max-h-[40vh] overflow-y-auto pr-1">
+                    <div id="waitress-comanda-scroll" class="space-y-2 flex-1 min-h-[200px] overflow-y-auto pr-1">
                         <p class="text-xs font-bold text-slate-400 uppercase tracking-wider sticky top-0 bg-slate-900/95 py-1 z-10">Platillos en Comanda</p>
                         ${itemsListHtml}
                     </div>
 
-                    <div id="waitress-catalog-scroll" class="space-y-2 pt-2 border-t border-slate-800 flex-1 min-h-[220px] overflow-y-auto pr-1">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Catálogo Rápido</p>
-                        ${waitressNumSearchHtml()}
-                        ${waitressCategoryChipsHtml()}
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            ${catalogByNumber().filter(waitressCatMatches).map(prod => {
-                                const available = isItemAvailable(prod);
-                                return `
-                                    <div title="${(prod.desc || '').replace(/"/g, '&quot;')}" onclick="addProductSKUToActiveTable('${prod.sku}')" class="bg-slate-950 ${available ? 'hover:border-orange-500 cursor-pointer' : 'opacity-50 cursor-not-allowed'} border border-slate-800 p-2 rounded-xl flex items-center gap-2 transition-all">
-                                        <img src="${prod.image}" class="w-8 h-8 rounded-lg object-cover" onerror="this.src='https://placehold.co/100x100/1e293b/fff?text=P'">
-                                        <div class="overflow-hidden">
-                                            <p class="text-[11px] font-bold text-white truncate">${dishBadge(dishNum(prod))}${prod.name}</p>
-                                            ${available
-                                                ? `<p class="text-[10px] text-emerald-400 font-bold">$${prod.price.toFixed(2)}</p>`
-                                                : `<span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30">AGOTADO</span>`
-                                            }
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
                 </div>
 
                 <div class="p-4 bg-slate-950 border-t border-slate-800 space-y-3">
+                    <button onclick="openWaiterMenuModal()" class="w-full py-3.5 rounded-xl font-black text-sm text-slate-950 flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all" style="background:linear-gradient(135deg,#fb923c,#f59e0b)">
+                        <i class="fa-solid fa-book-open"></i> VER MENÚ / AGREGAR PLATILLOS
+                    </button>
                     <div class="flex justify-between items-center text-sm font-black text-white">
                         <span>TOTAL CONSUMO:</span>
                         <span class="text-emerald-400 text-lg">$${subtotal.toFixed(2)} MXN</span>
@@ -3461,12 +3551,9 @@
             container.dataset.tableId = String(activeWaitressTableId);
             container.dataset.itemCount = String(table.items.length);
             if (_hadNumFocus) { const _ne = document.getElementById('waitress-num-input'); if (_ne) { _ne.focus(); try { _ne.setSelectionRange(_ne.value.length, _ne.value.length); } catch (e) {} } }
-            const _activeChip = container.querySelector('[data-cat-active="1"]');
-            if (_activeChip && _activeChip.parentElement) _activeChip.parentElement.scrollLeft = Math.max(0, _activeChip.offsetLeft - _activeChip.parentElement.clientWidth / 2 + _activeChip.clientWidth / 2);
             if (savedScroll) {
                 const setTop = (id, v) => { const el = document.getElementById(id); if (el) el.scrollTop = v; };
                 setTop('waitress-outer-scroll', savedScroll.outer);
-                setTop('waitress-catalog-scroll', savedScroll.catalog);
                 // si se agregó un renglón nuevo, mostrar el final de la comanda; si no, quedarse donde estaba
                 const cm = document.getElementById('waitress-comanda-scroll');
                 if (cm) cm.scrollTop = table.items.length > prevItemCount ? cm.scrollHeight : savedScroll.comanda;
@@ -4415,14 +4502,23 @@
                             <i class="fa-solid fa-door-open"></i> Liberar
                        </button>`;
 
+                const stCls = t.status === 'occupied' ? 'mon-occ' : (t.status === 'paying' ? 'mon-pay-st' : 'mon-free');
+                const seats = Math.min(10, Math.max(4, t.guests || 0));
+                const filled = Math.min(t.guests || 0, seats);
+                const chairs = Array.from({ length: seats }, (_, ci) => `<span class="mesa-chair ${ci < filled ? 'on' : ''}" style="transform:translate(-50%,-50%) rotate(${(ci * 360 / seats).toFixed(1)}deg) translateY(-62px)"></span>`).join('');
+                const total = t.items.reduce((s, i) => s + (i.price * i.qty), 0);
                 const card = document.createElement('div');
-                card.className = "bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center";
+                card.className = `mon-card ${stCls} p-3`;
                 card.innerHTML = `
-                    <div>
-                        <h5 class="font-bold text-white text-sm">${t.name} (${t.code})</h5>
-                        <p class="text-xs text-slate-400">Estado: <span class="font-semibold ${statusColor}">${statusText}</span></p>
+                    <div style="height:108px">
+                        <div class="mesa-viz" style="transform:scale(.72);transform-origin:top center;margin-top:0">
+                            ${chairs}
+                            <div class="mesa-top"><span class="mesa-name">${t.name}</span><span class="mesa-amt">${t.status === 'free' ? 'Libre' : '$' + total.toFixed(0)}</span></div>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-1.5">
+                    <p class="text-center text-[10px] font-mono font-bold text-slate-500 mt-1">${t.code}</p>
+                    <p class="text-center text-xs text-slate-400 mt-0.5">Estado: <span class="font-bold ${statusColor}">${statusText}</span>${t.status !== 'free' ? ` · ${t.guests} pers.` : ''}</p>
+                    <div class="mt-3 flex justify-center">
                         ${actionButtons}
                     </div>
                 `;
