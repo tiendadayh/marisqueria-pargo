@@ -32,6 +32,29 @@
 
 
     <style>
+        /* ===== AJUSTES PARA TELÉFONO ===== */
+        html { -webkit-text-size-adjust: 100%; }
+        * { -webkit-tap-highlight-color: transparent; }
+        @media (max-width: 1023px) {
+            /* Mesera: una sola pantalla a la vez (mesas ↔ comanda) */
+            #role-view-waitress > div:first-child { flex: 1 1 auto; min-height: 0; }
+            #role-view-waitress:not(.wt-open) #waitress-order-panel { display: none; }
+            #role-view-waitress.wt-open > div:first-child { display: none; }
+            #role-view-waitress.wt-open #waitress-order-panel { flex: 1 1 auto; min-height: 0; }
+        }
+        @media (max-width: 640px) {
+            /* 16px evita el zoom automático de iOS al tocar un campo */
+            input, select, textarea { font-size: 16px !important; }
+            main, body { overscroll-behavior-y: none; }
+            /* espacio para que la barra inferior no tape contenido */
+            #role-view-customer, #role-view-kitchen, #role-view-admin { padding-bottom: 4.5rem; }
+            #role-view-waitress > div:first-child { padding-bottom: 5rem; }
+            #waitress-order-panel { padding-bottom: 4rem; }
+            /* ventanas emergentes: nunca más altas que la pantalla */
+            .fixed.inset-0 > div { max-height: 94dvh; }
+            #waitress-live-summary { gap: .5rem; }
+        }
+        #role-nav { padding-bottom: calc(.375rem + env(safe-area-inset-bottom)); }
         /* Con una ventana abierta, la página de atrás no se desplaza: solo hay una barra */
         body:has(.fixed.inset-0.flex:not(.hidden)) { overflow: hidden; }
         body {
@@ -3438,12 +3461,22 @@
             return `<div class="bg-sky-500/10 border border-sky-500/40 rounded-xl p-3 text-xs font-bold text-sky-200"><i class="fa-solid fa-building-columns mr-1.5"></i>${msg}</div>`;
         }
 
+        function backToWaitressTables() {
+            playUiSound('tick');
+            if (waiterMenuOpen()) closeModal('modal-waiter-menu');
+            activeWaitressTableId = null;
+            renderWaitressTablesList();
+            renderWaitressOrderPanel();
+            window.scrollTo(0, 0);
+        }
+
         function renderWaitressOrderPanel() {
             const container = document.getElementById('waitress-order-panel');
             if (activeWaitressTableId !== null) {
                 const _t = tables.find(t => t.id === activeWaitressTableId);
                 if (!_t || !canViewTable(_t)) activeWaitressTableId = null;
             }
+            { const _sec = document.getElementById('role-view-waitress'); if (_sec) _sec.classList.toggle('wt-open', !!activeWaitressTableId); }
             const keepScroll = (id) => { const el = document.getElementById(id); return el ? el.scrollTop : 0; };
             const sameTable = container.dataset.tableId === String(activeWaitressTableId);
             const savedScroll = sameTable
@@ -3491,8 +3524,9 @@
             waitressNumRefocus = false;
             container.innerHTML = `
                 <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2" style="background:linear-gradient(135deg,rgba(249,115,22,.14),rgba(6,24,42,.95) 55%);border-bottom:2px solid rgba(249,115,22,.45)">
+                    <button onclick="backToWaitressTables()" class="lg:hidden w-full flex items-center gap-2 text-xs font-black text-orange-300 bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2.5 active:scale-95"><i class="fa-solid fa-arrow-left"></i> Mis mesas</button>
                     <div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <h3 class="font-extrabold text-white text-base">${table.name}</h3>
                             <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-xs font-medium">${table.guests} personas</span>
                             <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-sm font-black border border-emerald-500/30">$${subtotal.toFixed(2)}</span>
