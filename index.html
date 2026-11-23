@@ -1805,8 +1805,21 @@
                 return claim === 'ended' ? 'ended-free' : 'ok';
             }
             if (!table.sid) return 'ok';
-            if (!claim) { try { localStorage.setItem(key, table.sid); } catch (e) {} return 'ok'; }
+            if (!claim) return table.pin ? 'needpin' : 'ok';
             return claim === table.sid ? 'ok' : 'ended';
+        }
+        function customerPinGateHtml(table) {
+            return `
+                <div class="py-10 px-4 text-center space-y-4">
+                    <div class="w-16 h-16 mx-auto rounded-full bg-sky-500/15 border border-sky-500/40 flex items-center justify-center text-3xl">🔐</div>
+                    <h3 class="text-lg font-black text-white">${escapeHtmlText(table.name)}</h3>
+                    <p class="text-xs text-slate-400">Pide el <b class="text-sky-300">código de 4 dígitos</b> a tu mesera para ver y pedir en tu mesa.</p>
+                    <div class="flex gap-2 max-w-xs mx-auto">
+                        <input id="customer-join-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="0000" onkeydown="if(event.key==='Enter')joinCustomerTable()" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-center text-lg font-black tracking-[0.4em] focus:outline-none focus:border-sky-500">
+                        <button onclick="joinCustomerTable()" class="px-5 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs rounded-xl">Entrar</button>
+                    </div>
+                    <p class="text-[10px] text-slate-500">Si vienen varios en la mesa, comparten el mismo código.</p>
+                </div>`;
         }
         function customerFarewellHtml(table) {
             const canJoin = table.status !== 'free';
@@ -1829,7 +1842,7 @@
         function joinCustomerTable() {
             const t = getCustomerTable();
             const v = (document.getElementById('customer-join-pin')?.value || '').trim();
-            if (!t || !t.pin || v !== String(t.pin)) { showToast('Código incorrecto', 'error'); return; }
+            if (!t || !t.pin || v !== String(t.pin)) { playUiSound('deny'); showToast('Código incorrecto', 'error'); return; }
             try { localStorage.setItem(customerClaimKey(t), t.sid); } catch (e) {}
             renderCustomerView();
         }
@@ -3512,6 +3525,11 @@
                             <button onclick="clearTableCall(${table.id})" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg text-xs whitespace-nowrap">YA LO ATENDÍ</button>
                         </div>
                     ` : ''}
+
+                    ${table.pin ? `<div class="flex items-center justify-between gap-3 rounded-xl p-3 border border-sky-500/40" style="background:linear-gradient(135deg,rgba(14,165,233,.16),rgba(6,24,42,.9))">
+                        <div class="min-w-0"><p class="text-[10px] font-extrabold text-sky-300 uppercase tracking-wider"><i class="fa-solid fa-key mr-1"></i>Código de la mesa</p><p class="text-[10px] text-slate-400">Díselo al cliente para que vea y pida desde su celular</p></div>
+                        <span class="font-mono font-black text-3xl text-white tracking-[0.25em] shrink-0">${table.pin}</span>
+                    </div>` : ''}
 
                     ${waiterKitchenStripHtml(table)}
 
@@ -5376,6 +5394,7 @@
                 return;
             }
             { const _g = customerSessionGate(table);
+              if (_g === 'needpin') { const _hasPin = document.getElementById('customer-join-pin'); if (!_hasPin) container.innerHTML = customerPinGateHtml(table); footer.innerHTML = ''; return; }
               if (_g === 'ended' || _g === 'ended-free') { container.innerHTML = customerFarewellHtml(table); footer.innerHTML = ''; return; } }
 
             const total = table.items.reduce((s, i) => s + (i.price * i.qty), 0);
