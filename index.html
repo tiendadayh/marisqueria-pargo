@@ -36,23 +36,19 @@
         html { -webkit-text-size-adjust: 100%; }
         * { -webkit-tap-highlight-color: transparent; }
         @media (max-width: 1023px) {
+            /* En teléfono la página se desplaza normal (sin cajas internas que atrapen el dedo) */
+            main, #role-view-waitress, #waitress-order-panel, #waitress-outer-scroll, #waitress-comanda-scroll,
+            #role-view-waitress > div:first-child { overflow: visible !important; max-height: none !important; }
             /* Mesera: una sola pantalla a la vez (mesas ↔ comanda) */
-            #role-view-waitress > div:first-child { flex: 1 1 auto; min-height: 0; }
             #role-view-waitress:not(.wt-open) #waitress-order-panel { display: none; }
             #role-view-waitress.wt-open > div:first-child { display: none; }
-            #role-view-waitress.wt-open #waitress-order-panel { flex: 1 1 auto; min-height: 0; }
         }
         @media (max-width: 640px) {
             /* 16px evita el zoom automático de iOS al tocar un campo */
             input, select, textarea { font-size: 16px !important; }
-            main, body { overscroll-behavior-y: none; }
-            /* espacio para que la barra inferior no tape contenido */
             #role-view-customer, #role-view-kitchen, #role-view-admin { padding-bottom: 4.5rem; }
             #role-view-waitress > div:first-child { padding-bottom: 5rem; }
             #waitress-order-panel { padding-bottom: 4rem; }
-            /* ventanas emergentes: nunca más altas que la pantalla */
-            .fixed.inset-0 > div { max-height: 94dvh; }
-            #waitress-live-summary { gap: .5rem; }
         }
         #role-nav { padding-bottom: calc(.375rem + env(safe-area-inset-bottom)); }
         /* Con una ventana abierta, la página de atrás no se desplaza: solo hay una barra */
