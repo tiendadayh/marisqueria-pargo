@@ -1320,6 +1320,7 @@
             wifiSsid: '',
             wifiPass: '',
             soundAlerts: true,
+            kitchenStations: 1,
             kitchenSeq: 0,
             bankName: '',
             bankHolder: '',
@@ -1479,6 +1480,18 @@
 
         // --- COCINA: los pedidos confirmados llegan solos, en orden de llegada ---
         // Cada ticket vive dentro de su mesa (table.kitchen) y viaja con la sincronización en la nube.
+        const DRINK_CATS = ['bebidas', 'tarros', 'tragos'];
+        function isDrinkItem(i) {
+            if (!i) return false;
+            if (typeof i.drink === 'boolean') return i.drink;
+            const p = catalog.find(x => x.sku === i.sku);
+            return !!(p && DRINK_CATS.includes(p.category));
+        }
+        // La cocina solo ve lo que hay que cocinar: comida pendiente de entregar
+        function kitchenNeedsTicket(k) {
+            if (k.kind === 'cancel') return (k.items || []).some(i => !isDrinkItem(i));
+            return (k.items || []).some(i => !isDrinkItem(i) && !i.delivered);
+        }
         function queueKitchenTicket(table, items, kind, note) {
             if (!items || !items.length) return;
             storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
@@ -1495,8 +1508,14 @@
                 tableName: table.name,
                 waiter: table.waiter || '',
                 guests: table.guests || 0,
-                items: items.map(i => ({ sku: i.sku, name: i.name, qty: i.qty, notes: i.notes || '', num: dishNumByItem(i) }))
+                items: items.map(i => ({ sku: i.sku, name: i.name, qty: i.qty, notes: i.notes || '', num: dishNumByItem(i), drink: isDrinkItem(i) }))
             });
+            // Solo bebidas: no pasan por cocina, quedan listas para que la mesera las lleve
+            const _k = table.kitchen[table.kitchen.length - 1];
+            if (_k.items.every(i => i.drink)) {
+                if (_k.kind === 'cancel') { _k.status = 'served'; _k.servedAt = _k.at; }
+                else { _k.status = 'ready'; _k.readyAt = _k.at; _k.startedAt = _k.at; _k.drinksOnly = true; }
+            }
         }
         function kitchenNumLabel(n) { return '#' + String(((Number(n) || 1) - 1) % 999 + 1).padStart(3, '0'); }
         function kitchenElapsedMin(iso) { return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000)); }
@@ -1513,18 +1532,60 @@
             if (act.some(k => k.status === 'new')) return 'new';
             return '';
         }
+        // Prioridad: no se puede empezar un pedido mientras haya uno anterior sin terminar
+        function kitchenBlocker(k) {
+            if (!k || k.kind === 'cancel') return null;
+            const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
+            const act = allKitchenTickets().filter(x => x.k.id !== k.id && x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
+            const before = x => (x.k.n || 0) < (k.n || 0) || ((x.k.n || 0) === (k.n || 0) && String(x.k.at) < String(k.at));
+            // 1) hay un pedido anterior que aún no se empieza: ese va primero
+            const waiting = act.find(x => x.k.status === 'new' && before(x));
+            if (waiting) return waiting;
+            // 2) todas las cocinas están ocupadas: espera a que termine la más antigua
+            const cooking = act.filter(x => x.k.status === 'cooking');
+            if (cooking.length >= n) return cooking[0];
+            return null;
+        }
+        function cycleKitchenStations() {
+            const n = (Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1)) % 3) + 1;
+            storeConfig.kitchenStations = n;
+            saveData(true);
+            renderKitchenView();
+            showToast(n === 1 ? 'Una cocina: se prepara un pedido a la vez' : `${n} cocinas: se pueden preparar ${n} pedidos a la vez, siempre en orden de llegada`, 'info');
+        }
         function setKitchenStatus(tableId, kid, status) {
             const t = tables.find(x => x.id === tableId);
             const k = t && (t.kitchen || []).find(x => x.id === kid);
             if (!k) return;
             const now = new Date().toISOString();
+            if (status === 'ready' && k.kind !== 'cancel' && !kitchenAllDone(k)) { showToast('Marca ✓ todos los platillos antes de dar LISTO', 'warning'); return; }
+            if (status === 'cooking' && k.status !== 'new') return;
+            if (status === 'cooking') { const b = kitchenBlocker(k); if (b) { showToast(`Primero termina ${kitchenNumLabel(b.k.n)} · ${b.t.name}`, 'warning'); return; } }
             k.status = status;
             if (status === 'cooking') k.startedAt = now;
-            if (status === 'ready') { k.readyAt = now; if (!k.startedAt) k.startedAt = now; }
+            if (status === 'ready') { k.readyAt = now; if (!k.startedAt) k.startedAt = now; foodItemsOf(k).forEach(i => { i.done = true; }); }
             if (status === 'served') { k.servedAt = now; if (k.kind !== 'cancel') (k.items || []).forEach(i => { i.delivered = true; }); }
             saveData();
             refreshAllTableViews();
             playUiSound(status === 'ready' ? 'confirm' : 'tick');
+        }
+        // --- AVANCE DE COCINA (el cocinero palomea cada platillo; es distinto de "entregado") ---
+        function foodItemsOf(k) { return (k.items || []).filter(i => !isDrinkItem(i)); }
+        function kitchenAllDone(k) { return foodItemsOf(k).every(i => i.done || k.status === 'ready' || k.status === 'served'); }
+        function kitchenDoneCount(k) { return foodItemsOf(k).filter(i => i.done || k.status === 'ready' || k.status === 'served').length; }
+        function toggleKitchenItemDone(tableId, kid, idx) {
+            const t = tables.find(x => x.id === tableId);
+            const k = t && (t.kitchen || []).find(x => x.id === kid);
+            if (!k || !k.items[idx] || k.status !== 'cooking') return;
+            k.items[idx].done = !k.items[idx].done;
+            saveData();
+            refreshAllTableViews();
+            playUiSound('tick');
+        }
+        function itemDoneQty(table, sku) {
+            let n = 0;
+            (table.kitchen || []).forEach(k => { if (k.kind !== 'cancel' && k.status === 'cooking') (k.items || []).forEach(i => { if (i.sku === sku && i.done && !i.delivered) n += i.qty; }); });
+            return n;
         }
         // --- ENTREGA AL CLIENTE (la marca la mesera, platillo por platillo) ---
         function finishKitchenIfDelivered(k) {
@@ -1568,7 +1629,8 @@
             if (!table || !item) return '';
             const del = Math.min(item.qty, itemDeliveredQty(table, item.sku));
             const rdy = Math.min(item.qty - del, itemReadyQty(table, item.sku));
-            return (del > 0 ? `<span class="inline-block mt-0.5 mr-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-500 text-slate-950">✓ ${del} entregado${del > 1 ? 's' : ''}</span>` : '')
+            const dn = Math.min(item.qty - del - rdy, itemDoneQty(table, item.sku));
+            return (dn > 0 ? `<span class="inline-block mt-0.5 mr-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-orange-500/15 text-orange-300 border border-orange-500/30">✓ ${dn} hecho${dn > 1 ? 's' : ''} en cocina</span>` : '') + (del > 0 ? `<span class="inline-block mt-0.5 mr-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-500 text-slate-950">✓ ${del} entregado${del > 1 ? 's' : ''}</span>` : '')
                  + (rdy > 0 ? `<span class="inline-block mt-0.5 mr-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">🍽️ ${rdy} listo${rdy > 1 ? 's' : ''} en cocina</span>` : '');
         }
 
@@ -1583,20 +1645,39 @@
                 : (k.status === 'ready' ? 'border-emerald-500/50 bg-emerald-950/20'
                 : (k.status === 'cooking' ? 'border-orange-500/60 bg-orange-950/20' : 'border-amber-500/60 bg-slate-900'));
             const hora = new Date(k.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-            const rows = (k.items || []).map(i => `
-                <div class="flex items-start gap-3 py-2 border-b border-slate-800/80 last:border-0 ${i.delivered ? 'opacity-60' : ''}">
+            const idxItems = (k.items || []).map((i, idx) => ({ i, idx }));
+            const foodRows = idxItems.filter(x => !isDrinkItem(x.i)).map(({ i, idx }) => `
+                <div class="flex items-start gap-3 py-2 border-b border-slate-800/80 last:border-0 ${i.done ? 'opacity-60' : ''}">
                     <span class="text-2xl font-black text-white w-12 shrink-0 text-right">${i.qty}×</span>
                     ${dishImgHtml(i, 'w-16 h-16 rounded-xl border border-slate-700')}
-                    <div class="min-w-0">
-                        <p class="text-base font-extrabold text-white leading-tight">${dishBadge(i.num, true)} ${escapeHtmlText(i.name)}${i.delivered ? ' <span class="text-emerald-400 text-sm">✓ entregado</span>' : ''}</p>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-base font-extrabold text-white leading-tight ${i.done ? 'line-through' : ''}">${dishBadge(i.num, true)} ${escapeHtmlText(i.name)}</p>
                         ${i.notes ? `<p class="mt-1 inline-block px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black">📝 ${escapeHtmlText(i.notes)}</p>` : ''}
                     </div>
+                    ${isCancel || k.status === 'new' ? '' : `<button type="button" ${k.status === 'cooking' ? `onclick="toggleKitchenItemDone(${t.id},'${k.id}',${idx})"` : 'disabled'} class="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-lg font-black border ${(i.done || k.status === 'ready') ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-500 border-slate-600'}" title="Platillo preparado">✓</button>`}
                 </div>`).join('');
+            const drinkItems = idxItems.filter(x => isDrinkItem(x.i));
+            const drinkRows = drinkItems.length ? `
+                <div class="mt-1 rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-2">
+                    <p class="text-[10px] font-extrabold text-cyan-300 uppercase tracking-wider mb-1">🍺 Bebidas · las lleva la mesera, no se cocinan</p>
+                    ${drinkItems.map(({ i }) => `<p class="text-xs font-bold ${i.delivered ? 'text-emerald-400 line-through opacity-70' : 'text-slate-300'}">${i.qty}× ${escapeHtmlText(i.name)}${i.delivered ? ' ✓ entregada' : ''}</p>`).join('')}
+                </div>` : '';
+            const rows = foodRows + drinkRows;
             const btn = (st, label, cls) => `<button onclick="setKitchenStatus(${t.id},'${k.id}','${st}')" class="flex-1 py-3 ${cls} text-white font-black rounded-xl text-sm shadow-md">${label}</button>`;
             let actions;
             if (isCancel) actions = btn('served', 'ENTERADO', 'bg-rose-600 hover:bg-rose-500');
-            else if (k.status === 'new') actions = btn('cooking', '🔥 EMPEZAR', 'bg-orange-600 hover:bg-orange-500') + btn('ready', '✅ LISTO', 'bg-emerald-600 hover:bg-emerald-500');
-            else if (k.status === 'cooking') actions = btn('ready', '✅ ¡LISTO!', 'bg-emerald-600 hover:bg-emerald-500');
+            else if (k.status === 'new') {
+                const b = kitchenBlocker(k);
+                actions = b
+                    ? `<p class="flex-1 text-center text-xs font-bold text-amber-300 py-2">⏳ En espera · primero termina ${kitchenNumLabel(b.k.n)} (${escapeHtmlText(b.t.name)})</p>`
+                    : btn('cooking', '🔥 EMPEZAR', 'bg-orange-600 hover:bg-orange-500');
+            }
+            else if (k.status === 'cooking') {
+                const fl = foodItemsOf(k), dn = fl.filter(i => i.done).length;
+                actions = dn >= fl.length
+                    ? btn('ready', '✅ ¡LISTO!', 'bg-emerald-600 hover:bg-emerald-500')
+                    : `<button disabled class="flex-1 py-3 bg-slate-800 text-slate-500 font-black rounded-xl text-sm cursor-not-allowed">✅ LISTO · palomea todo (${dn}/${fl.length})</button>`;
+            }
             else actions = '<p class="flex-1 text-center text-xs font-bold text-emerald-300 py-2">✅ Listo · esperando a que la mesera lo entregue</p>';
             return `
                 <div class="rounded-2xl border-2 ${border} p-3 shadow-xl">
@@ -1619,7 +1700,7 @@
         function renderKitchenView() {
             const board = document.getElementById('kitchen-board');
             if (!board) return;
-            const all = allKitchenTickets();
+            const all = allKitchenTickets().filter(x => kitchenNeedsTicket(x.k));
             const cols = [
                 { key: 'new', title: '🆕 Nuevos', hint: 'Por empezar' },
                 { key: 'cooking', title: '🔥 En preparación', hint: 'En la estufa' },
@@ -1628,7 +1709,9 @@
             const counts = {};
             cols.forEach(c => { counts[c.key] = all.filter(x => x.k.status === c.key).length; });
             const cnt = document.getElementById('kitchen-counters');
+            const _ns = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
             if (cnt) cnt.innerHTML = `
+                <button type="button" onclick="cycleKitchenStations()" class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-200 border border-slate-600 font-bold" title="Cuántos pedidos se preparan a la vez">👨‍🍳 Cocinas: ${_ns}</button>
                 <span class="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Nuevos ${counts.new}</span>
                 <span class="px-2.5 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30">En preparación ${counts.cooking}</span>
                 <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Listos ${counts.ready}</span>`;
@@ -1659,15 +1742,19 @@
         let kitchenSeen = null;
         function checkKitchenChanges() {
             const nowMap = {};
-            const fresh = [], ready = [];
+            const fresh = [], ready = [], started = [], progressed = [];
             tables.forEach(t => (t.kitchen || []).forEach(k => {
-                nowMap[k.id] = k.status;
+                const dc = foodItemsOf(k).filter(i => i.done).length;
+                nowMap[k.id] = { s: k.status, d: dc };
                 if (!kitchenSeen) return;
                 const recent = (Date.now() - new Date(k.at).getTime()) < 120000;
                 if (!(k.id in kitchenSeen)) {
                     if (k.status === 'new' && recent) fresh.push({ t, k });
-                } else if (kitchenSeen[k.id] !== 'ready' && k.status === 'ready' && k.kind !== 'cancel') {
-                    ready.push({ t, k });
+                } else {
+                    const prev = kitchenSeen[k.id] || {};
+                    if (prev.s !== 'ready' && k.status === 'ready' && k.kind !== 'cancel') ready.push({ t, k });
+                    else if (prev.s === 'new' && k.status === 'cooking' && k.kind !== 'cancel') started.push({ t, k });
+                    else if (k.status === 'cooking' && dc > (prev.d || 0)) progressed.push({ t, k, dc });
                 }
             }));
             kitchenSeen = nowMap;
@@ -1678,6 +1765,13 @@
                 if (storeConfig.soundAlerts) { alertChime(); alertSpeak('Nuevo pedido, ' + names); }
             }
             if (currentRole !== 'kitchen') {
+                const st = started.filter(x => canViewTable(x.t));
+                if (st.length) {
+                    const names = st.map(x => x.t.name).join(', ');
+                    showToast(`🔥 Cocina empezó a preparar: ${names}`, 'info');
+                    if (storeConfig.soundAlerts) alertChime();
+                }
+                progressed.filter(x => canViewTable(x.t)).forEach(x => showToast(`✓ ${x.t.name}: ${x.dc} de ${foodItemsOf(x.k).length} platillos listos en cocina`, 'info'));
                 const mine = ready.filter(x => canViewTable(x.t));
                 if (mine.length) {
                     const names = mine.map(x => x.t.name).join(', ');
@@ -1692,19 +1786,29 @@
             const lbl = { new: ['Enviado a cocina', 'text-amber-200 bg-amber-500/10 border-amber-500/30'], cooking: ['En preparación 🔥', 'text-orange-200 bg-orange-500/10 border-orange-500/30'], ready: ['¡LISTO PARA LLEVAR! 🍽️', 'text-emerald-100 bg-emerald-500/15 border-emerald-500/50'] };
             return `<div class="space-y-2">` + act.map(k => {
                 const l = lbl[k.status] || lbl.new;
-                const pend = (k.items || []).filter(i => !i.delivered).length;
-                const rows = (k.items || []).map((i, idx) => `
-                    <button type="button" onclick="deliverKitchenItem(${table.id},'${k.id}',${idx})" class="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg border ${i.delivered ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200' : 'bg-slate-950/60 border-slate-700 text-slate-200'}">
+                const pend = (k.items || []).filter(i => !i.delivered && (isDrinkItem(i) || i.done || k.status === 'ready')).length;
+                const fl = foodItemsOf(k);
+                const prog = (!k.drinksOnly && k.status === 'cooking' && fl.length) ? ` · ${kitchenDoneCount(k)} de ${fl.length} listos` : '';
+                const rows = (k.items || []).map((i, idx) => {
+                    const can = i.delivered || isDrinkItem(i) || i.done || k.status === 'ready';
+                    const hecho = !i.delivered && !isDrinkItem(i) && (i.done || k.status === 'ready');
+                    return `
+                    <button type="button" ${can ? `onclick="deliverKitchenItem(${table.id},'${k.id}',${idx})"` : 'disabled'} class="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg border ${i.delivered ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200' : (can ? 'bg-slate-950/60 border-slate-700 text-slate-200' : 'bg-slate-950/30 border-slate-800 text-slate-500 cursor-not-allowed')}">
                         <span class="w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-xs font-black ${i.delivered ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-transparent border border-slate-600'}">✓</span>
-                        <span class="text-xs font-bold">${i.qty}× ${dishBadge(i.num)}${escapeHtmlText(i.name)}${i.delivered ? ' · entregado' : ''}</span>
-                    </button>`).join('');
+                        <span class="text-xs font-bold">${i.qty}× ${dishBadge(i.num)}${escapeHtmlText(i.name)}${isDrinkItem(i) && !i.delivered ? ' <span class="text-cyan-300">🍺 llévala ya</span>' : ''}${i.delivered ? ' · entregado' : (hecho ? ' <span class="text-emerald-300">· ✅ listo en cocina, llévalo</span>' : (!can ? ' · 🔥 en preparación' : ''))}</span>
+                    </button>`; }).join('');
                 return `<div class="border rounded-xl p-2.5 space-y-1.5 ${l[1]}">
-                    <p class="text-xs font-extrabold"><i class="fa-solid fa-fire-burner mr-1.5"></i>Cocina ${kitchenNumLabel(k.n)} · ${l[0]}</p>
+                    <p class="text-xs font-extrabold"><i class="fa-solid fa-fire-burner mr-1.5"></i>${k.drinksOnly ? 'Bebidas · listas para llevar 🍺' : `Cocina ${kitchenNumLabel(k.n)} · ${l[0]}${prog}`}</p>
                     <div class="space-y-1">${rows}</div>
                     ${pend > 1 ? `<button type="button" onclick="deliverKitchenAll(${table.id},'${k.id}')" class="w-full py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-[11px]">✓ MARCAR TODO ENTREGADO</button>` : ''}
-                    <p class="text-[10px] opacity-70">Toca cada platillo cuando se lo lleves al cliente.</p>
+                    <p class="text-[10px] opacity-70">Toca cada platillo cuando se lo lleves al cliente (solo los que cocina ya marcó como listos).</p>
                 </div>`;
             }).join('') + `</div>`;
+        }
+        function customerProgress(table) {
+            let tot = 0, dn = 0;
+            (table.kitchen || []).filter(k => k.status === 'cooking' && k.kind !== 'cancel').forEach(k => { tot += foodItemsOf(k).length; dn += kitchenDoneCount(k); });
+            return tot ? ` · ${dn} de ${tot} platillos listos` : '';
         }
         function customerKitchenHtml(table) {
             const st = tableKitchenState(table);
@@ -1712,7 +1816,7 @@
                 const hadOrders = (table.kitchen || []).some(k => k.kind !== 'cancel' && k.status === 'served');
                 return hadOrders ? `<div class="border rounded-2xl p-3 text-xs font-bold bg-emerald-500/15 border-emerald-500/40 text-emerald-200">✅ Tu pedido fue entregado. ¡Buen provecho!</div>` : '';
             }
-            const txt = st === 'ready' ? '🍽️ ¡Tu pedido está listo! Ya te lo llevan' : (st === 'cooking' ? '🔥 Tu pedido se está preparando' : '👨‍🍳 Tu pedido ya está en cocina');
+            const txt = st === 'ready' ? '🍽️ ¡Tu pedido está listo! Ya te lo llevan' : (st === 'cooking' ? '🔥 Tu pedido se está preparando' + customerProgress(table) : '👨‍🍳 Tu pedido ya está en cocina');
             const cls = st === 'ready' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200' : 'bg-orange-500/10 border-orange-500/30 text-orange-200';
             return `<div class="border rounded-2xl p-3 text-xs font-bold ${cls}">${txt}</div>`;
         }
@@ -2168,7 +2272,7 @@
             const due = [];
             tables.forEach(t => {
                 if (!t.calling) { delete callRemindState[t.name]; return; }
-                const mine = isAdminUnlocked || (currentWaitressSession && t.waiter === currentWaitressSession);
+                const mine = (isAdminUnlocked && currentRole === 'admin') || (currentWaitressSession && t.waiter === currentWaitressSession);
                 if (!mine) return;
                 if (callRemindState[t.name] === undefined) { callRemindState[t.name] = now; return; }
                 if (now - callRemindState[t.name] >= CALL_REMIND_MS) {
@@ -2498,9 +2602,11 @@
         function waitressHasPin(st) { return !!(st && st.pinHash && st.pinSalt); }
 
         function canViewTable(t) {
-            if (isAdminUnlocked) return true;
-            if (!currentWaitressSession) return false;
-            return t.status === 'free' || t.waiter === currentWaitressSession;
+            // El admin ve todo solo en su pantalla de Admin. En la pantalla de meseras
+            // (aunque el admin esté desbloqueado) cada quien ve únicamente lo libre y lo suyo.
+            if (isAdminUnlocked && currentRole === 'admin') return true;
+            if (t.status === 'free') return true;
+            return !!currentWaitressSession && t.waiter === currentWaitressSession;
         }
 
         function showWaitressLoginError(msg) {
@@ -3241,7 +3347,7 @@
 
             { let sum = document.getElementById('waitress-live-summary');
               if (!sum) { sum = document.createElement('div'); sum.id = 'waitress-live-summary'; sum.className = 'grid grid-cols-3 gap-2'; container.insertAdjacentElement('beforebegin', sum); }
-              if (!currentWaitressSession && !isAdminUnlocked) { sum.innerHTML = ''; }
+              if (false) { sum.innerHTML = ''; }
               else {
                 const nFree = visibleTables.filter(t => t.status === 'free').length;
                 const nMine = visibleTables.filter(t => t.status !== 'free').length;
@@ -3250,8 +3356,8 @@
                 sum.innerHTML = st('Libres', nFree, 'text-emerald-400') + st('Atendiendo', nMine, 'text-amber-400') + st('Avisos', nPay, nPay ? 'text-purple-400 animate-pulse' : 'text-slate-500');
               } }
 
-            if (!currentWaitressSession && !isAdminUnlocked) {
-                container.innerHTML = '<div class="col-span-2 lg:col-span-1 p-4 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-400"><i class="fa-solid fa-lock text-orange-400 text-base mb-1.5 block"></i>Inicia sesión con tu PIN para ver y atender tus mesas.</div>';
+            if (!currentWaitressSession && !visibleTables.length) {
+                container.innerHTML = '<div class="col-span-2 lg:col-span-1 p-4 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-400"><i class="fa-solid fa-lock text-orange-400 text-base mb-1.5 block"></i>No hay mesas disponibles. Inicia sesión con tu PIN para ver las tuyas.</div>';
                 return;
             }
 
