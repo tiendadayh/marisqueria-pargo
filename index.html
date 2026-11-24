@@ -3523,11 +3523,13 @@
             grid.innerHTML = catalogByNumber().filter(waitressCatMatches).map(prod => {
                 const available = isItemAvailable(prod);
                 const it = table.items.find(i => i.sku === prod.sku);
-                const q = it ? it.qty : 0;
-                const canMinus = it && it.qty > getConfirmedQty(it);
+                const conf = it ? getConfirmedQty(it) : 0;
+                const q = it ? getPendingQty(it) : 0; // solo lo nuevo, por confirmar (lo confirmado ya no cuenta aquí)
+                const canMinus = q > 0;
                 const img = `<div class="relative"><img src="${prod.image}" class="w-full h-24 object-cover ${available ? '' : 'grayscale opacity-60'}" onerror="this.src='https://placehold.co/300x200/1e293b/fff?text=Platillo'">
                         <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
                         ${q > 0 ? `<div class="absolute top-1.5 right-1.5 min-w-[1.75rem] h-7 px-1.5 rounded-full bg-orange-500 text-slate-950 text-sm font-black flex items-center justify-center shadow-lg">${q}</div>` : ''}
+                        ${conf > 0 ? `<div class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-black shadow">🔒 ${conf} ya confirmado${conf > 1 ? 's' : ''}</div>` : ''}
                         ${available ? '' : '<div class="absolute inset-0 flex items-center justify-center"><span class="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-rose-600 text-white">AGOTADO</span></div>'}</div>`;
                 const body = `<div class="p-2.5 space-y-1.5">
                         <p class="text-xs font-bold text-white leading-tight line-clamp-2 min-h-[2rem]">${escapeHtmlText(prod.name)}</p>
