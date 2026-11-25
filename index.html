@@ -37,7 +37,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         // Paleta "mar": se reemplaza el gris azulado por azul océano profundo (estilo del logo)
-        tailwind.config = { theme: { extend: { colors: { slate: {
+        if (typeof tailwind !== 'undefined') tailwind.config = { theme: { extend: { colors: { slate: {
             50:'#f4faff',100:'#e6f3fc',200:'#c9e3f5',300:'#a5c8e3',400:'#7ea6c6',500:'#5b84a6',
             600:'#3f6485',700:'#264a68',800:'#16344f',900:'#0b2238',950:'#06182a' } } } } };
     </script>
@@ -46,7 +46,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Google Fonts: Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&family=Archivo:wght@700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet">
     
     <!-- Librerías QR y PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1779,16 +1779,16 @@
         function dishImgHtml(entry, cls) {
             const prod = entry && entry.sku ? catalog.find(p => p.sku === entry.sku) : null;
             const src = (entry && entry.image) || (prod && prod.image) || '';
-            const fb = "https://placehold.co/100x100/1e293b/fff?text=P";
-            return `<img src="${escapeHtmlText(src || fb)}" alt="" loading="lazy" class="${cls} object-cover shrink-0" onerror="this.onerror=null;this.src='${fb}'">`;
+            const cat = escapeHtmlText((prod && prod.category) || '');
+            return `<img src="${escapeHtmlText(src || menuIcon(cat))}" alt="" loading="lazy" class="${cls} object-cover shrink-0" onerror="this.onerror=null;this.src=menuIcon('${cat}')">`;
         }
         // Foto grande del platillo al tocarla (cliente y mesera)
         function dishZoomSku(sku) {
             const p = catalog.find(x => x.sku === sku); if (!p) return;
             let o = document.getElementById('dish-zoom');
             if (!o) { o = document.createElement('div'); o.id = 'dish-zoom'; o.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(2,6,15,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out'; o.onclick = () => o.remove(); document.body.appendChild(o); }
-            const fb = 'https://placehold.co/600x400/1e293b/fff?text=Platillo';
-            o.innerHTML = `<div style="max-width:560px;width:100%;background:#0f172a;border:1px solid #334155;border-radius:20px;overflow:hidden" onclick="event.stopPropagation()"><img src="${escapeHtmlText(p.image || fb)}" onerror="this.onerror=null;this.src='${fb}'" style="width:100%;max-height:60vh;object-fit:cover;display:block"><div style="padding:14px 16px;color:#fff"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:18px">${escapeHtmlText(p.name)}</b><b style="font-size:18px;color:#34d399">$${Number(p.price).toFixed(2)}</b></div>${p.desc ? `<p style="font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.4">${escapeHtmlText(p.desc)}</p>` : ''}<button onclick="document.getElementById('dish-zoom').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:12px;background:#334155;color:#fff;font-weight:800">Cerrar</button></div></div>`;
+            const fb = menuIcon(p.category);
+            o.innerHTML = `<div style="max-width:560px;width:100%;background:#0f172a;border:1px solid #334155;border-radius:20px;overflow:hidden" onclick="event.stopPropagation()"><img src="${escapeHtmlText(p.image || fb)}" onerror="this.onerror=null;this.src=menuIcon('${escapeHtmlText(p.category || '')}')" style="width:100%;max-height:60vh;object-fit:cover;display:block"><div style="padding:14px 16px;color:#fff"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:18px">${escapeHtmlText(p.name)}</b><b style="font-size:18px;color:#34d399">$${Number(p.price).toFixed(2)}</b></div>${p.desc ? `<p style="font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.4">${escapeHtmlText(p.desc)}</p>` : ''}<button onclick="document.getElementById('dish-zoom').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:12px;background:#334155;color:#fff;font-weight:800">Cerrar</button></div></div>`;
         }
         function parseDishEntry(raw) {
             const m = String(raw || '').trim().toLowerCase().match(/^(?:(\d{1,2})\s*[x*]\s*)?(\d{1,3})$/);
@@ -2411,14 +2411,14 @@
                     <p class="text-xs font-bold text-slate-300">¿Eres un cliente nuevo en esta mesa?</p>
                     <p class="text-[10px] text-slate-500">Pide el código de 4 dígitos a tu mesera.</p>
                     <div class="flex gap-2">
-                        <input id="customer-join-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="0000" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white text-center text-sm font-black tracking-[0.4em] focus:outline-none focus:border-emerald-500">
+                        <input id="customer-join-pin2" type="tel" inputmode="numeric" maxlength="4" placeholder="0000" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white text-center text-sm font-black tracking-[0.4em] focus:outline-none focus:border-emerald-500">
                         <button onclick="joinCustomerTable()" class="px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl">Entrar</button>
                     </div>
                 </div>` : ''}`;
         }
         function joinCustomerTable() {
             const t = getCustomerTable();
-            const v = (document.getElementById('customer-join-pin')?.value || '').trim();
+            const v = ((document.getElementById('customer-join-pin') || document.getElementById('customer-join-pin2'))?.value || '').trim();
             if (!t || !t.pin || v !== String(t.pin)) { playUiSound('deny'); showToast('Código incorrecto', 'error'); return; }
             try { localStorage.setItem(customerClaimKey(t), t.sid); } catch (e) {}
             renderCustomerView();
@@ -4441,7 +4441,7 @@
                 const conf = it ? getConfirmedQty(it) : 0;
                 const q = it ? getPendingQty(it) : 0; // solo lo nuevo, por confirmar (lo confirmado ya no cuenta aquí)
                 const canMinus = q > 0;
-                const img = `<div class="relative"><img src="${prod.image}" onclick="event.stopPropagation();dishZoomSku('${prod.sku}')" class="w-full h-28 md:h-36 object-cover cursor-zoom-in ${available ? '' : 'grayscale opacity-60'}" onerror="this.src='https://placehold.co/300x200/1e293b/fff?text=Platillo'">
+                const img = `<div class="relative"><img src="${prod.image}" onclick="event.stopPropagation();dishZoomSku('${prod.sku}')" class="w-full h-28 md:h-36 object-cover cursor-zoom-in ${available ? '' : 'grayscale opacity-60'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                         <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
                         ${q > 0 ? `<div class="absolute top-1.5 right-1.5 min-w-[1.75rem] h-7 px-1.5 rounded-full bg-orange-500 text-slate-950 text-sm font-black flex items-center justify-center shadow-lg">${q}</div>` : ''}
                         ${conf > 0 ? `<div class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-black shadow">🔒 ${conf} ya confirmado${conf > 1 ? 's' : ''}</div>` : ''}
@@ -5828,14 +5828,27 @@
         function handleProductFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                uploadedBase64Photo = evt.target.result;
+            if (!/^image\//.test(file.type)) { showToast('Elige un archivo de imagen', 'warning'); return; }
+            // Se recorta al centro en formato cuadrado y se comprime: así todas las fotos
+            // se ven iguales en la web de pedidos, mesera, cocina, admin y PDF (y pesan poco).
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const side = Math.min(img.width, img.height);
+                const out = Math.max(1, Math.min(640, side));
+                const c = document.createElement('canvas');
+                c.width = out; c.height = out;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, out, out);
+                ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, out, out);
+                URL.revokeObjectURL(url);
+                uploadedBase64Photo = c.toDataURL('image/jpeg', 0.82);
                 updateCatalogImagePreview(uploadedBase64Photo);
-                showToast('Foto cargada exitosamente', 'success');
+                showToast('Foto cargada y ajustada', 'success');
             };
-            reader.readAsDataURL(file);
+            img.onerror = () => { URL.revokeObjectURL(url); showToast('No se pudo leer la imagen', 'error'); };
+            img.src = url;
         }
 
         function updateCatalogImagePreview(url) {
@@ -5999,7 +6012,7 @@
                 tr.className = "hover:bg-slate-800/40 transition-colors";
                 tr.innerHTML = `
                     <td class="p-3 hidden sm:table-cell">
-                        <img src="${prod.image}" class="w-9 h-9 rounded-lg object-cover ${available ? '' : 'grayscale opacity-60'}" onerror="this.src='https://placehold.co/100x100/1e293b/fff?text=P'">
+                        <img src="${prod.image}" class="w-9 h-9 rounded-lg object-cover ${available ? '' : 'grayscale opacity-60'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                     </td>
                     <td class="p-3">
                         <div class="font-bold text-white">${dishBadge(dishNum(prod))}${prod.name}</div>
@@ -6057,7 +6070,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             ${items.map(prod => `
                                 <div class="flex items-center gap-3 border border-slate-200 rounded-xl p-2 bg-white" style="break-inside: avoid; page-break-inside: avoid;">
-                                    <img src="${prod.image}" crossorigin="anonymous" class="w-16 h-16 rounded-lg object-cover shrink-0" onerror="this.src='https://placehold.co/200x200/eee/333?text=Comida'">
+                                    <img src="${prod.image}" crossorigin="anonymous" class="w-16 h-16 rounded-lg object-cover shrink-0" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                                     <div class="min-w-0 flex-1">
                                         <h4 class="font-extrabold text-slate-900 text-xs leading-tight">${dishBadgePrint(dishNum(prod))}${prod.name}</h4>
                                         ${prod.desc ? `<p class="text-[10px] text-slate-500 leading-tight mt-0.5">${prod.desc}</p>` : ''}
@@ -6558,9 +6571,11 @@
         }
 
         function saveCloudConfigAndConnect() {
-            const enabled = document.getElementById('cloud-enabled-checkbox').checked;
-            const roomId = (document.getElementById('cloud-room-id').value || 'marisqueria-pargo').trim();
-            const firebaseJson = document.getElementById('cloud-firebase-json').value.trim();
+            const _cb = document.getElementById('cloud-enabled-checkbox'), _rm = document.getElementById('cloud-room-id'), _js = document.getElementById('cloud-firebase-json');
+            if (!_cb || !_rm || !_js) return; // esta pantalla ya no existe: la nube se conecta sola
+            const enabled = _cb.checked;
+            const roomId = (_rm.value || 'marisqueria-pargo').trim();
+            const firebaseJson = _js.value.trim();
 
             cloudConfig = { enabled, roomId, firebaseJson };
             localStorage.setItem('pargo_pro_v3_cloud', JSON.stringify(cloudConfig));
@@ -6707,6 +6722,7 @@
                     cloudSyncStatus = { state: 'ok', msg: 'En vivo' };
 
                     isApplyingCloudUpdate = true;
+                    try {
                     const previousTables = tables;
                     if (Array.isArray(data.tables)) tables = data.tables;
                     if (Array.isArray(data.staff)) staff = data.staff;
@@ -6734,7 +6750,8 @@
                     renderAdminCatalog();
                     renderAdminReports();
                     populatePrintDropdown();
-                    isApplyingCloudUpdate = false;
+                    } catch (e) { console.error('Error aplicando datos de la nube', e); }
+                    finally { isApplyingCloudUpdate = false; }
                 }, (err) => {
                     updateCloudPill('Local', false);
                     const code = (err && err.code) ? err.code : 'error';
@@ -6848,7 +6865,7 @@
                 return `
                     <div class="bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden ${available ? '' : 'opacity-70'}">
                         <div class="relative cursor-zoom-in" onclick="dishZoomSku('${prod.sku}')">
-                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="w-full h-28 object-cover ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.src='https://placehold.co/300x200/1e293b/fff?text=Platillo'">
+                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="w-full h-28 object-cover ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.onerror=null;this.src=menuIcon('${prod.category}')">
                             <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
                             <span class="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold ${available ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white'}">${available ? 'Disponible' : 'Agotado'}</span>
                         </div>
@@ -7380,19 +7397,33 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-chip{flex:none;padding:7px 13px;border-radius:999px;background:#12304f;border:1px solid #1e4a78;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;color:#fff}
 .lv-chip:hover{background:#f97316;color:#111;border-color:#f97316}
 .lv-body{padding:6px 14px 40px}
-.lv-sec{scroll-margin-top:140px}
-.lv-sec h2{margin:18px 0 10px;font-size:18px;font-weight:800;color:#fbbf24}
-.lv-grid{display:grid;grid-template-columns:1fr;gap:10px}
-.lv-card{display:flex;gap:12px;padding:10px;border-radius:16px;background:rgba(11,31,54,.95);border:1px solid #1e3a5f;overflow:hidden}
-.lv-img{width:88px;height:88px;border-radius:12px;object-fit:cover;flex:none;background:#12304f}
-.lv-info{flex:1;min-width:0;display:flex;flex-direction:column}
-.lv-name{font-weight:800;font-size:14px;line-height:1.25}
-.lv-desc{color:#94a3b8;font-size:11px;margin:3px 0 6px;line-height:1.35}
-.lv-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.lv-price{color:#34d399;font-weight:800;font-size:16px}
-.lv-add{padding:8px 14px;border-radius:12px;background:#f97316;color:#111;font-weight:800;font-size:12px}
-.lv-add[disabled]{background:#334155;color:#94a3b8}
-.lv-card.off .lv-img{filter:grayscale(1);opacity:.5}
+.lv-sec{scroll-margin-top:140px;margin:0 0 26px}
+#llevar-root.lite{background:#e7f0f3;color:#0a1f33}
+.lv-cat{background:#fff;border:2px solid #0a1f33;border-radius:26px;box-shadow:8px 8px 0 #0a1f33;overflow:hidden;color:#0a1f33}
+.lv-cat-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;background:#0a1f33;border-bottom:4px solid #ff5a2c;padding:16px 20px 14px}
+.lv-cat-head h2{margin:0;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:30px;line-height:1;letter-spacing:-.02em;color:#fff}
+.lv-count{font-family:Archivo,Inter,sans-serif;font-weight:800;font-size:12px;color:#ffa21f;white-space:nowrap}
+.lv-grid{display:grid;grid-template-columns:1fr;column-gap:30px;padding:6px 20px 8px}
+.lv-card{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:2px dashed #b9cfd2;background:none;border-top:0;border-left:0;border-right:0;border-radius:0}
+.lv-card:last-child{border-bottom:0}
+.lv-text{flex:1;min-width:0;display:flex;flex-direction:column}
+.lv-line1{display:flex;align-items:baseline;gap:8px}
+.lv-name{font-family:Archivo,Inter,sans-serif;font-weight:800;font-size:17px;line-height:1.2;color:#0a1f33}
+.lv-dots{flex:1;min-width:12px;border-bottom:3px dotted #a7b9c0;transform:translateY(-3px)}
+.lv-price{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:20px;color:#d9431e;white-space:nowrap}
+.lv-desc{font-family:Fraunces,Georgia,serif;font-weight:400;font-size:15px;line-height:1.4;color:#4c5d69;margin:5px 0 10px}
+.lv-act{margin-top:auto}
+.lv-imgbox{--s:96px;flex:none;width:var(--s);height:var(--s);border-radius:14px;border:2px solid #0a1f33;overflow:hidden;background:#dbe7ea}
+.lv-img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+.lv-add{width:40px;height:40px;border-radius:12px;background:#ff5a2c;color:#fff;border:2px solid #0a1f33;box-shadow:3px 3px 0 #0a1f33;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:transform .08s,box-shadow .08s}
+.lv-add:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #0a1f33}
+.lv-add[disabled]{background:#cbd5db;color:#64748b;box-shadow:none;width:auto;padding:0 14px;font-size:13px}
+.lv-card.off .lv-imgbox img{filter:grayscale(1);opacity:.5}
+.lv-card.off .lv-name,.lv-card.off .lv-price{opacity:.55}
+.lv-card .lv-step button{width:40px;height:40px;border-radius:12px;background:#ff5a2c;color:#fff;border:2px solid #0a1f33;box-shadow:3px 3px 0 #0a1f33;font-size:20px}
+.lv-card .lv-step b{color:#0a1f33;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:18px;min-width:22px}
+.lv-card .lv-note{background:#f1f6f8;border:1.5px solid #b9cfd2;color:#0a1f33;margin-top:10px}
+.lv-card .lv-note:focus{border-color:#ff5a2c}
 .lv-step{display:flex;align-items:center;gap:10px}
 .lv-step button{width:34px;height:34px;border-radius:11px;background:#f97316;color:#111;font-weight:800;font-size:16px}
 .lv-step.sm button{width:28px;height:28px;border-radius:50%;font-size:14px}
@@ -7415,11 +7446,14 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-track{max-width:520px;margin:0 auto;text-align:center;padding:28px 0}
 .lv-msg{padding:40px 0;text-align:center;color:#94a3b8}
 @media(min-width:640px){
- .lv-grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
- .lv-card{display:block;padding:0;border-radius:18px}
- .lv-img{width:100%;height:140px;border-radius:0}
- .lv-info{display:block;padding:12px 14px 14px}
- .lv-foot{margin-top:10px}
+ .lv-grid{grid-template-columns:repeat(auto-fit,minmax(330px,1fr));padding:8px 26px 10px}
+ .lv-cat-head{padding:18px 26px 16px}
+ .lv-cat-head h2{font-size:36px}
+ .lv-imgbox{--s:112px}
+ .lv-card:nth-child(odd):nth-last-child(2){border-bottom:0}
+}
+@media(min-width:1400px){
+ .lv-imgbox{--s:130px}
 }
 @media(min-width:1024px){
  .lv-top{padding-left:24px;padding-right:24px}
@@ -7430,8 +7464,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
  .lv-info-top{display:block}
  .lv-layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:26px;align-items:start}
  .lv-side{position:sticky;top:150px;max-height:calc(100vh - 170px);overflow-y:auto}
- .lv-img{height:150px}
- .lv-sec h2{font-size:20px}
+ .lv-imgbox{--s:118px}
 }`;
             document.head.appendChild(css);
 
@@ -7468,7 +7501,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             }
 
             function logo() { var im = Array.prototype.find.call(document.images, function (i) { return i.src.indexOf('data:image/jpeg') === 0 && i.src.length > 20000; }); return im ? im.src : ''; }
-            function shell(b, chips) {
+            function shell(b, chips, light) {
+                root.classList.toggle('lite', !!light);
                 var l = logo();
                 return `<div class="lv"><div class="lv-top"><div class="lv-top-in"><div class="lv-brand">${l ? `<img src="${l}">` : ''}<div><b>Marisquería PARGO</b><small>Pedidos para llevar · pagas al recoger</small></div><div class="lv-info-top">Pedidos y reservaciones: 744 294 0816<br>12:30 a 6:30 pm · Sin servicio los miércoles</div></div>${chips ? `<div class="lv-chips">${chips}</div>` : ''}</div></div><div class="lv-body">${b}</div></div>`;
             }
@@ -7490,7 +7524,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             function ctl(sku) {
                 var q = cart[sku] || 0, p = MENU.find(function (x) { return x.sku === sku; });
                 if (p && p.available === false) return '<button class="lv-add" disabled>Agotado</button>';
-                return q ? stepper(sku, q) : `<button class="lv-add" onclick="llvQty('${sku}',1)">+ Agregar</button>`;
+                return q ? stepper(sku, q) : `<button class="lv-add" aria-label="Agregar" onclick="llvQty('${sku}',1)">+</button>`;
             }
             function barInner() {
                 var n = cartCount();
@@ -7554,14 +7588,15 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 cats = cats.filter(function (c) { return avail.some(function (p) { return p.category === c.key; }); });
                 var chips = cats.map(function (c) { return `<a class="lv-chip" onclick="llvGo('${c.key}')">${c.emoji} ${esc(c.label)}</a>`; }).join('');
                 var body = cats.map(function (c) {
-                    return `<section id="cat-${c.key}" class="lv-sec"><h2>${c.emoji} ${esc(c.label)}</h2><div class="lv-grid">` + avail.filter(function (p) { return p.category === c.key; }).map(function (p) {
-                        return `<div class="lv-card${p.available === false ? ' off' : ''}"><img class="lv-img" loading="lazy" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"><div class="lv-info"><div class="lv-name">${esc(p.name)}</div><div class="lv-desc">${esc(p.desc || '')}</div><div class="lv-foot"><span class="lv-price">${$m(p.price)}</span><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div></div>`;
-                    }).join('') + '</div></section>';
+                    var list = avail.filter(function (p) { return p.category === c.key; });
+                    return `<section id="cat-${c.key}" class="lv-sec"><div class="lv-cat"><div class="lv-cat-head"><h2>${esc(c.label)}</h2><span class="lv-count">${list.length} ${list.length === 1 ? 'opción' : 'opciones'}</span></div><div class="lv-grid">` + list.map(function (p) {
+                        return `<div class="lv-card${p.available === false ? ' off' : ''}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox"><img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
+                    }).join('') + '</div></div></section>';
                 }).join('');
                 var consulta = '<div style="margin:0 0 14px;padding:12px;border-radius:14px;background:#0f172a;border:1px solid #1e293b"><div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:6px">🔎 ¿Ya hiciste un pedido hoy? Consulta cómo va</div><div style="display:flex;gap:8px"><input id="llv-code" class="lv-in" maxlength="4" autocapitalize="characters" placeholder="Tu código (4 letras)" style="margin:0;flex:1;text-transform:uppercase"><button onclick="llvFind()" style="padding:0 16px;border-radius:12px;background:#0284c7;color:#fff;font-weight:800">Ver</button></div><p id="llv-find-err" style="color:#fb7185;font-size:12px;min-height:14px;margin:6px 0 0"></p></div>';
                 var main = '<div class="lv-main">' + consulta + body + '</div>';
                 var layout = desk() ? `<div class="lv-layout">${main}<aside id="lv-side" class="lv-side">${sideHtml()}</aside></div>` : main;
-                root.innerHTML = shell(layout, chips) + (desk() ? '' : `<div id="llv-bar" class="lv-bar">${barInner()}</div>`);
+                root.innerHTML = shell(layout, chips, true) + (desk() ? '' : `<div id="llv-bar" class="lv-bar">${barInner()}</div>`);
             }
             function renderCheckout() {
                 var it = items();
