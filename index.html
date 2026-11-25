@@ -248,6 +248,19 @@
         body.waiter-locked #role-nav,
         body.kitchen-locked #role-nav,
         body.kitchen-locked #paying-tables-alert-banner { display: none !important; }
+        /* Enlaces de mesero/cocina: la barra solo muestra Instalar y Para llevar (sin botones de roles) */
+        body.waiter-locked #role-nav > button[id^="role-btn-"], body.waiter-locked #role-nav > button[id^="viewlock-btn-"],
+        body.kitchen-locked #role-nav > button[id^="role-btn-"], body.kitchen-locked #role-nav > button[id^="viewlock-btn-"] { display: none !important; }
+        html.pwa-can body.waiter-locked #role-nav, html.pwa-can body.kitchen-locked #role-nav { display: flex !important; }
+        /* "Para llevar" es solo del administrador */
+        body.waiter-locked #llevar-fab, body.kitchen-locked #llevar-fab, body.customer-locked #llevar-fab,
+        body.waiter-locked #llevar-panel, body.kitchen-locked #llevar-panel, body.customer-locked #llevar-panel { display: none !important; }
+        /* Barra de botones: que quepan hasta 6 en el teléfono */
+        @media (max-width: 767px) {
+            #role-nav { white-space: normal; gap: 2px; }
+            #role-nav > button { min-width: 0; padding-left: .2rem; padding-right: .2rem; font-size: 11px !important; }
+            #role-nav > button span { line-height: 1.1; text-align: center; }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-orange-500 selection:text-white">
@@ -274,6 +287,10 @@
 
         <!-- Selector de Modo Operativo -->
         <nav id="role-nav" class="flex items-center gap-1 shrink-0 whitespace-nowrap bg-slate-900/95 backdrop-blur p-1.5 border-t border-slate-800 fixed bottom-0 inset-x-0 z-40 md:static md:inset-auto md:p-1 md:rounded-2xl md:border md:bg-slate-900/90 md:shadow-inner">
+            <button type="button" id="pwa-install-btn" style="display:none" class="flex-1 md:flex-none flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all bg-amber-500 text-slate-900 shadow-md" title="Instalar la app en este dispositivo">
+                <i class="fa-solid fa-download text-base md:text-xs"></i>
+                <span>Instalar</span>
+            </button>
             <button onclick="switchRole('admin')" id="role-btn-admin" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
                 <i class="fa-solid fa-lock text-base md:text-xs"></i>
                 <span>Admin / Caja</span>
@@ -293,6 +310,10 @@
                 <span>Vista Cliente</span>
             </button>
             <button onclick="openViewLockSet('customer')" id="viewlock-btn-customer" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña opcional para Ver como Cliente"><i class="fa-solid fa-lock-open"></i></button>
+            <button type="button" id="llevar-fab" style="display:none" class="flex-1 md:flex-none flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all bg-sky-600 text-white shadow-md" title="Pedidos para llevar">
+                <i class="fa-solid fa-bag-shopping text-base md:text-xs"></i>
+                <span>Para llevar <span id="llevar-badge" class="ml-0.5 px-1.5 rounded-full bg-rose-600 text-white" style="display:none"></span></span>
+            </button>
         </nav>
 
         <!-- Control de Audio de Alertas + Reloj -->
@@ -742,6 +763,8 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <input type="date" id="corte-date" onchange="onCorteDateInput()" class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
                             <button onclick="downloadCorteDia(this)" class="caja-tool bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/20"><i class="fa-solid fa-file-pdf"></i> Corte del día (PDF)</button>
+                            <button onclick="sendCorteWhatsApp(this)" class="caja-tool bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20"><i class="fa-brands fa-whatsapp"></i> Enviar al dueño</button>
+                            <input type="tel" id="owner-phone-input" inputmode="tel" placeholder="WhatsApp del dueño" onchange="saveOwnerPhone(this)" class="px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white w-40 focus:outline-none focus:border-emerald-500">
                        </div>
                     </div>
 
@@ -903,10 +926,12 @@
                             <table class="caja-tbl w-full text-left text-xs">
                                 <thead class="border-b border-slate-800">
                                     <tr>
+                                        <th class="p-3">#</th>
                                         <th class="p-3">Mesera</th>
                                         <th class="p-3">Estado</th>
                                         <th class="p-3 text-center">Cuentas cerradas</th>
                                         <th class="p-3 text-right">Venta total (MXN)</th>
+                                        <th class="p-3 text-right">Cuenta promedio</th>
                                         <th class="p-3" style="min-width:150px">% de ventas de meseros</th>
                                     </tr>
                                 </thead>
@@ -916,6 +941,12 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Platillos más vendidos + tiempo de mesa -->
+                    <div class="caja-sec"><span class="caja-num"><i class="fa-solid fa-fire"></i></span><div><h3>Platillos más vendidos</h3><p>Los 10 productos con más piezas vendidas en el periodo elegido.</p></div></div>
+                    <div class="caja-card p-4"><div id="top-dishes-box" class="space-y-2"></div></div>
+                    <div class="caja-sec"><span class="caja-num"><i class="fa-solid fa-hourglass-half"></i></span><div><h3>Tiempo que ocupa una mesa</h3><p>Desde que se abre la mesa hasta que se cobra la cuenta completa. Solo cuentan ventas nuevas (las anteriores no guardaron la hora de apertura).</p></div></div>
+                    <div class="caja-card p-4"><div id="table-time-box" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div></div>
 
                     <!-- 5. Historial -->
                     <div class="caja-sec"><span class="caja-num">5</span><div><h3>Historial de ventas cerradas</h3><p>Cada fila es una cuenta cobrada. En <b class="text-slate-300">Mesa</b> ves el número de mesa, o <span class="caja-tag-web"><i class="fa-solid fa-globe"></i>WEB</span> si el pedido entró por la web. En <b class="text-slate-300">Mesera</b> ves quién atendió, o <span class="caja-tag-ped"><i class="fa-solid fa-bag-shopping"></i>PEDIDO</span> si no hubo mesera.</p></div></div>
@@ -1794,6 +1825,24 @@
             if (kitchenHasOpenTickets()) return;
             storeConfig.kitchenSeq = 0;
             storeConfig.kitchenSeqDay = today;
+            storeConfig.webSeq = {}; storeConfig.webArrived = {};
+        }
+        // Pedidos de la web: entran a la misma numeración que las mesas (mesa1, mesa2, web3, mesa4...) cuando el admin los acepta
+        function assignWebSeq(id) {
+            rolloverKitchenSeqIfNewDay();
+            if (!storeConfig.kitchenSeqDay) storeConfig.kitchenSeqDay = localDayKey();
+            if (!storeConfig.webSeq) storeConfig.webSeq = {};
+            if (storeConfig.webSeq[id]) return storeConfig.webSeq[id];
+            storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
+            storeConfig.webSeq[id] = storeConfig.kitchenSeq;
+            saveData();
+            return storeConfig.webSeq[id];
+        }
+        function webArrivedGet(id) { return !!(storeConfig.webArrived && storeConfig.webArrived[id]); }
+        function webArrivedSet(id) { if (!storeConfig.webArrived) storeConfig.webArrived = {}; storeConfig.webArrived[id] = new Date().toISOString(); saveData(); }
+        // La cocina no puede cobrarse mientras haya platillos de la mesa sin terminar
+        function kitchenPendingForTable(table) {
+            return (table.kitchen || []).some(k => k.kind !== 'cancel' && k.status !== 'served' && k.status !== 'ready' && kitchenNeedsTicket(k));
         }
         function prepStatsFor(day) {
             const l = (storeConfig.prepLog || []).filter(x => x.day === day);
@@ -1852,11 +1901,30 @@
             if (act.some(k => k.status === 'new')) return 'new';
             return '';
         }
+        function webQueueRaw() { try { return (typeof window.llvKitchenOrders === 'function' ? window.llvKitchenOrders() : []).slice().sort((a, b) => a.n - b.n); } catch (e) { return []; } }
+        function webKitchenEntries(tk) {
+            const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1)), out = [];
+            webQueueRaw().forEach(w => {
+                const earlier = tk.filter(x => (x.k.n || 0) < w.n).length + out.filter(x => x.k.n < w.n).length;
+                out.push({ t: { id: 0, name: 'WEB · ' + w.name }, k: { id: 'W' + w.id, n: w.n, at: w.at, kind: 'order', status: earlier >= n ? 'new' : 'cooking', items: [] } });
+            });
+            return out;
+        }
+        window.kitchenWebBlocker = function (wid) {
+            const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
+            const webs = webQueueRaw(), me = webs.find(w => w.id === wid);
+            if (!me) return null;
+            const tk = allKitchenTickets().filter(x => x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
+            const earlier = tk.filter(x => (x.k.n || 0) < me.n).concat(webs.filter(w => w.n < me.n).map(w => ({ t: { name: 'WEB · ' + w.name }, k: { id: 'W' + w.id, n: w.n } })));
+            earlier.sort((a, b) => (a.k.n || 0) - (b.k.n || 0));
+            return earlier.length >= n ? earlier[0] : null;
+        };
         // Prioridad: no se puede empezar un pedido mientras haya uno anterior sin terminar
         function kitchenBlocker(k) {
             if (!k || k.kind === 'cancel') return null;
             const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
-            const act = allKitchenTickets().filter(x => x.k.id !== k.id && x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
+            const tk = allKitchenTickets().filter(x => x.k.id !== k.id && x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
+            const act = tk.concat(webKitchenEntries(tk));
             const before = x => (x.k.n || 0) < (k.n || 0) || ((x.k.n || 0) === (k.n || 0) && String(x.k.at) < String(k.at));
             // 1) hay un pedido anterior que aún no se empieza: ese va primero
             const waiting = act.find(x => x.k.status === 'new' && before(x));
@@ -2318,7 +2386,7 @@
             renderPayingTablesBanner();
             try {
                 if (isAdminUnlocked && sessionStorage.getItem('pargo_current_role') === 'admin') switchRole('admin');
-                else if (sessionStorage.getItem('pargo_current_role') === 'kitchen') switchRole('kitchen');
+                else if (sessionStorage.getItem('pargo_current_role') === 'kitchen' && !/[?&]vista=/.test(location.search)) switchRole('kitchen');
             } catch (e) {}
             renderAdminLiveMonitor();
             renderAdminStaff();
@@ -2382,6 +2450,31 @@
                     osc.stop(t0 + n.t + n.d + 0.02);
                 });
             } catch (e) {}
+        }
+
+        // ---- Ventas: no se pierden al sincronizar entre dispositivos ----
+        const PENDING_SALES_KEY = 'pargo_pending_sales';
+        let lastCloudAppliedAt = '';
+        function getPendingSales() { try { return JSON.parse(localStorage.getItem(PENDING_SALES_KEY) || '[]') || []; } catch (e) { return []; } }
+        function setPendingSales(a) { try { localStorage.setItem(PENDING_SALES_KEY, JSON.stringify(a.slice(-300))); } catch (e) {} }
+        function markSalePending(id) { const a = getPendingSales(); if (a.indexOf(id) < 0) { a.push(id); setPendingSales(a); } }
+        // Une las ventas de la nube con las de ESTE dispositivo que todavía no llegan a la nube
+        function mergeCloudSales(cloudList, cloudCfg) {
+            const cloud = (Array.isArray(cloudList) ? cloudList : []).map(s => ({ ...s, method: s.method || 'Efectivo' }));
+            const ids = new Set(cloud.map(s => s.id));
+            const resetAt = (cloudCfg && cloudCfg.salesResetAt) || '';
+            const pending = getPendingSales();
+            const keep = [], still = [];
+            (Array.isArray(salesHistory) ? salesHistory : []).forEach(s => {
+                if (!s || pending.indexOf(s.id) < 0 || ids.has(s.id)) return;
+                if (resetAt && s.closedAt && s.closedAt < resetAt) return; // el admin reinició las ventas
+                keep.push(s); still.push(s.id);
+            });
+            setPendingSales(still);
+            if (!keep.length) return { list: cloud, pushBack: false };
+            const list = keep.concat(cloud);
+            list.sort((a, b) => String(b.closedAt || '').localeCompare(String(a.closedAt || '')));
+            return { list, pushBack: true };
         }
 
         function saveData(skipCloud = false) {
@@ -2636,6 +2729,28 @@
             } catch (e) {}
         }
 
+        // Recordatorio cada 20 s hasta que se atienda: pedido sin aceptar (cocina) y comida lista sin recoger (mesera/admin)
+        const KITCHEN_REMIND_MS = 20000;
+        function kitchenReminderTick() {
+            try {
+                if (!storeConfig.soundAlerts || customerLockedMesaCode || currentRole === 'customer') return;
+                const pend = [], ready = [];
+                tables.forEach(t => (t.kitchen || []).forEach(k => {
+                    if (k.kind === 'cancel' || k.drinksOnly) return;
+                    if (k.status === 'new') pend.push(t);
+                    else if (k.status === 'ready') ready.push(t);
+                }));
+                const uniq = a => [...new Set(a.map(t => t.name))].join(', ');
+                if (currentRole === 'kitchen') {
+                    // Cocina ya no repite pitidos: solo suena una vez al llegar el pedido
+                } else {
+                    const mine = ready.filter(t => canViewTable(t));
+                    if (mine.length) { alertChime(); setTimeout(() => alertSpeak('Pedido listo en cocina, ' + uniq(mine)), 700); }
+                }
+            } catch (e) {}
+        }
+        setInterval(kitchenReminderTick, KITCHEN_REMIND_MS);
+
         function handleIncomingBillAlert(payload) {
             if (!payload || !payload.id || payload.id === lastPlayedAlertId) return;
             lastPlayedAlertId = payload.id;
@@ -2752,7 +2867,7 @@
         function viewLockOf(role) { return (storeConfig.viewLocks && storeConfig.viewLocks[role]) || null; }
         function viewLockOk(role) { try { return sessionStorage.getItem('pargo_view_ok_' + role) === '1'; } catch (e) { return false; } }
         function viewLockGateRole() {
-            if (kitchenLocked && viewLockOf('kitchen') && !viewLockOk('kitchen')) return 'kitchen';
+            // El enlace de Cocina ya no pide contraseña; solo se pide en Admin para modificar al "ver como" Cocina/Cliente
             return '';
         }
         function showViewLockErr(m) { const e = document.getElementById('view-lock-error'); e.textContent = m; e.classList.toggle('hidden', !m); }
@@ -2766,7 +2881,7 @@
                 ? 'Opcional. Es la contraseña para desbloquear y modificar desde la pantalla de Mesera cuando entras como admin. Si no pones una, se usa tu contraseña de administrador. Las meseras siguen entrando con su usuario.'
                 : role === 'customer'
                 ? 'Opcional. Si la pones, "Ver como Cliente" será solo para mirar desde Admin: para hacer cambios tendrás que escribir esta contraseña. Los clientes que escanean su QR no la necesitan.'
-                : 'Opcional. Si la pones, "' + VIEW_LOCK_NAMES[role] + '" será solo para mirar desde Admin: para hacer cambios tendrás que escribir esta contraseña. También se la pedirá a quien abra el enlace de ' + VIEW_LOCK_NAMES[role] + '.';
+                : 'Opcional. Si la pones, "' + VIEW_LOCK_NAMES[role] + '" será solo para mirar desde Admin: para hacer cambios tendrás que escribir esta contraseña.';
             document.getElementById('view-lock-input').value = '';
             document.getElementById('view-lock-input').placeholder = has ? 'Nueva contraseña (4 a 32 caracteres)' : 'Contraseña (4 a 32 caracteres)';
             document.getElementById('view-lock-submit').textContent = 'Guardar';
@@ -4895,6 +5010,10 @@
                 showToast('Primero confirma el pedido: hay productos por confirmar', 'warning');
                 return;
             }
+            if (kitchenPendingForTable(table)) {
+                showToast('No se puede cobrar: cocina aún no termina el pedido de esta mesa', 'warning');
+                return;
+            }
 
             pendingCheckoutTableId = table.id;
             setCheckoutPaymentMethod(table.payMethod === 'Transferencia' ? 'Transferencia' : 'Efectivo');
@@ -4951,6 +5070,10 @@
             if (!targetId) return;
             const table = tables.find(t => t.id === targetId);
             if (!table) return;
+            if (kitchenPendingForTable(table)) {
+                showToast('No se puede cobrar: cocina aún no termina el pedido de esta mesa', 'warning');
+                return;
+            }
 
             if (selectedPaymentMethod === 'Transferencia' && !isAdminUnlocked && transferStatusOf(table) !== 'confirmed') {
                 showToast('Espera a que el administrador confirme el comprobante de transferencia para poder cobrar', 'warning');
@@ -4989,10 +5112,13 @@
                 phone: salePhone,
                 proof: (selectedPaymentMethod === 'Transferencia' && table.transferProof && table.transferProof.image) ? table.transferProof.image : '',
                 partial: isPartial,
+                openedAt: table.openedAt || '',
+                durationMin: (!isPartial && table.openedAt && isFinite(new Date(table.openedAt).getTime())) ? Math.max(1, Math.round((Date.now() - new Date(table.openedAt).getTime()) / 60000)) : null,
                 items: chargeItems.map(i => ({ sku: i.sku || '', name: i.name, price: i.price, qty: i.qty, notes: i.notes || '' })),
                 total: total
             });
 
+            markSalePending(folio);
             if (salesHistory[0] && salesHistory[0].proof) shrinkSaleProof(folio);
 
             const s = staff.find(st => st.name === table.waiter);
@@ -6038,6 +6164,7 @@
         function setCorteFilter(f) { corteFilter = f; renderAdminReports(); }
         function renderAdminReports() {
             { const _cd = document.getElementById('corte-date'); if (_cd && !_cd.value) _cd.value = localDayKey(); }
+            { const _op = document.getElementById('owner-phone-input'); if (_op && document.activeElement !== _op) _op.value = (storeConfig.ownerPhone || '').replace(/^52/, ''); }
             const SH = corteBase();
             const money = n => '$' + (Number(n) || 0).toFixed(2);
             const sum = arr => arr.reduce((a, s) => a + (Number(s.total) || 0), 0);
@@ -6097,21 +6224,20 @@
             const perfTbody = document.getElementById('staff-report-tbody');
             perfTbody.innerHTML = '';
 
-            staff.forEach(st => {
+            const ranked = staff.map(st => {
                 const mine = mesaSales.filter(s => s.waiter === st.name);
-                const stSales = sum(mine);
-                const stCount = mine.length;
+                return { st, n: mine.length, t: sum(mine) };
+            }).sort((x, y) => y.t - x.t || y.n - x.n);
+            ranked.forEach((r, idx) => {
+                const st = r.st, stSales = r.t, stCount = r.n;
                 const sharePercent = mesaTotal > 0 ? ((stSales / mesaTotal) * 100) : 0;
-
-                if (stSales > maxSales && stSales > 0) {
-                    maxSales = stSales;
-                    topName = st.name;
-                }
-
+                const medal = stSales > 0 ? (idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : String(idx + 1)) : '—';
+                if (stSales > maxSales && stSales > 0) { maxSales = stSales; topName = st.name; }
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/40 transition-colors";
                 tr.innerHTML = `
-                    <td class="p-3 font-bold text-white flex items-center gap-2">
+                    <td class="p-3 font-black text-slate-300">${medal}</td>
+                    <td class="p-3 font-bold text-white">
                         <i class="fa-solid fa-user-tie text-orange-400"></i> ${escapeHtmlText(st.name)}
                     </td>
                     <td class="p-3">
@@ -6121,13 +6247,32 @@
                     </td>
                     <td class="p-3 text-center font-bold text-white">${stCount}</td>
                     <td class="p-3 text-right font-black text-emerald-400">${money(stSales)}</td>
+                    <td class="p-3 text-right font-bold text-sky-300">${stCount ? money(stSales / stCount) : '—'}</td>
                     <td class="p-3"><div class="flex items-center gap-2"><div class="caja-bar flex-1" style="--k:#f59e0b"><i style="width:${sharePercent.toFixed(1)}%"></i></div><span class="font-bold text-slate-300 w-12 text-right">${sharePercent.toFixed(1)}%</span></div></td>
                 `;
                 perfTbody.appendChild(tr);
             });
-            if (!staff.length) perfTbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-500">Aún no hay meseras registradas</td></tr>`;
+            if (!staff.length) perfTbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Aún no hay meseras registradas</td></tr>`;
             { const tf = document.getElementById('staff-report-tfoot');
-              if (tf) tf.innerHTML = `<tr class="border-t border-slate-700 bg-slate-950/60"><td class="p-3 font-black text-white uppercase text-[11px] tracking-wider" colspan="2">Total meseros</td><td class="p-3 text-center font-black text-white">${mesaSales.length}</td><td class="p-3 text-right font-black text-orange-400">${money(mesaTotal)}</td><td class="p-3"></td></tr>`; }
+              if (tf) tf.innerHTML = `<tr class="border-t border-slate-700 bg-slate-950/60"><td class="p-3 font-black text-white uppercase text-[11px] tracking-wider" colspan="3">Total meseros</td><td class="p-3 text-center font-black text-white">${mesaSales.length}</td><td class="p-3 text-right font-black text-orange-400">${money(mesaTotal)}</td><td class="p-3 text-right font-black text-sky-300">${mesaSales.length ? money(mesaTotal / mesaSales.length) : '—'}</td><td class="p-3"></td></tr>`; }
+
+            // Platillos más vendidos
+            { const box = document.getElementById('top-dishes-box');
+              if (box) {
+                const d = {}; SH.forEach(x => (x.items || []).forEach(i => { const o = (d[i.name] = d[i.name] || { q: 0, t: 0 }); o.q += i.qty; o.t += i.qty * i.price; }));
+                const top = Object.keys(d).sort((a, b) => d[b].q - d[a].q).slice(0, 10);
+                const mx = top.length ? d[top[0]].q : 1;
+                box.innerHTML = top.length ? top.map((n, i) => `<div class="flex items-center gap-3 text-xs"><span class="w-5 text-slate-500 font-black">${i + 1}</span><span class="w-40 sm:w-56 truncate font-bold text-white">${escapeHtmlText(n)}</span><div class="caja-bar flex-1" style="--k:#f97316"><i style="width:${(d[n].q / mx * 100).toFixed(1)}%"></i></div><span class="w-16 text-right font-black text-orange-300">${d[n].q} pzas</span><span class="w-24 text-right text-emerald-400 font-bold">${money(d[n].t)}</span></div>`).join('') : '<p class="text-center text-slate-500 text-xs py-4">Sin ventas en este periodo</p>'; } }
+
+            // Tiempo promedio de mesa
+            { const box = document.getElementById('table-time-box');
+              if (box) {
+                const ds = mesaSales.map(x => x.durationMin).filter(v => typeof v === 'number' && v > 0);
+                const fm = m => m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
+                const tile = (l, v) => `<div class="rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-center"><div class="text-[10px] uppercase text-slate-400 font-bold">${l}</div><div class="text-lg font-black text-white mt-1">${v}</div></div>`;
+                box.innerHTML = ds.length
+                  ? tile('Promedio por mesa', fm(Math.round(ds.reduce((a, b) => a + b, 0) / ds.length))) + tile('Más corta', fm(Math.min(...ds))) + tile('Más larga', fm(Math.max(...ds))) + tile('Mesas medidas', ds.length)
+                  : '<p class="col-span-full text-center text-slate-500 text-xs py-4">Sin datos todavía: se registrará con las próximas cuentas cobradas.</p>'; } }
 
             setTxt('report-top-waitress', topName);
 
@@ -6191,6 +6336,9 @@
             const sumT = arr => arr.reduce((a, x) => a + x.total, 0);
             const chRow = (lbl, arr) => `<tr><td style="${'padding:4px 6px;border-bottom:1px solid #eee;font-size:11px;'}">${lbl}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:11px;text-align:right;">${arr.length}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:11px;text-align:right;">${money(sumT(arr.filter(x => x.method !== 'Transferencia')))}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:11px;text-align:right;">${money(sumT(arr.filter(x => x.method === 'Transferencia')))}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:11px;text-align:right;font-weight:700;">${money(sumT(arr))}</td></tr>`;
             const byW = {}; mesaS.forEach(x => { const w = x.waiter || '—'; (byW[w] = byW[w] || { n: 0, t: 0 }); byW[w].n++; byW[w].t += x.total; });
+            const wRank = Object.keys(byW).sort((a, b) => byW[b].t - byW[a].t);
+            const durs = mesaS.map(x => x.durationMin).filter(v => typeof v === 'number' && v > 0);
+            const fmM = m => m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
             const byCat = {}, byDish = {};
             sales.forEach(x => (x.items || []).forEach(i => {
                 const pr = catalog.find(c => c.sku === i.sku || c.name === i.name);
@@ -6222,9 +6370,12 @@
                 <table style="width:100%;border-collapse:collapse;"><tr><th style="${th}">Origen</th><th style="${th}text-align:right;">Cuentas</th><th style="${th}text-align:right;">Efectivo</th><th style="${th}text-align:right;">Transferencia</th><th style="${th}text-align:right;">Total</th></tr>
                 ${chRow('Ventas de meseros (en mesa)', mesaS)}${chRow('Ventas web (pedidos para llevar)', webS)}
                 <tr><td style="${td}font-weight:800;">TOTAL</td><td style="${tr}font-weight:800;">${sales.length}</td><td style="${tr}font-weight:800;">${money(cash)}</td><td style="${tr}font-weight:800;">${money(trf)}</td><td style="${tr}font-weight:800;">${money(total)}</td></tr></table>
-                ${h('Ventas de meseros')}
-                <table style="width:100%;border-collapse:collapse;"><tr><th style="${th}">Mesera</th><th style="${th}text-align:right;">Cuentas</th><th style="${th}text-align:right;">Total</th></tr>
-                ${Object.keys(byW).map(w => `<tr><td style="${td}">${escapeHtmlText(w)}</td><td style="${tr}">${byW[w].n}</td><td style="${tr}">${money(byW[w].t)}</td></tr>`).join('') || `<tr><td style="${td}" colspan="3">Sin ventas</td></tr>`}</table>
+                ${h('Ranking de meseras')}
+                <table style="width:100%;border-collapse:collapse;"><tr><th style="${th}">#</th><th style="${th}">Mesera</th><th style="${th}text-align:right;">Cuentas</th><th style="${th}text-align:right;">Venta total</th><th style="${th}text-align:right;">Cuenta promedio</th></tr>
+                ${wRank.map((w, i) => `<tr><td style="${td}">${i + 1}</td><td style="${td}">${escapeHtmlText(w)}</td><td style="${tr}">${byW[w].n}</td><td style="${tr}">${money(byW[w].t)}</td><td style="${tr}">${money(byW[w].t / byW[w].n)}</td></tr>`).join('') || `<tr><td style="${td}" colspan="5">Sin ventas</td></tr>`}</table>
+                ${h('Tiempo de mesa')}
+                <table style="width:100%;border-collapse:collapse;"><tr><th style="${th}">Promedio por mesa</th><th style="${th}">Más corta</th><th style="${th}">Más larga</th><th style="${th}">Mesas medidas</th></tr>
+                <tr><td style="${td}">${durs.length ? fmM(Math.round(durs.reduce((a, b) => a + b, 0) / durs.length)) : 'Sin datos'}</td><td style="${td}">${durs.length ? fmM(Math.min(...durs)) : '—'}</td><td style="${td}">${durs.length ? fmM(Math.max(...durs)) : '—'}</td><td style="${td}">${durs.length}</td></tr></table>
                 ${h('Por categoría')}
                 <table style="width:100%;border-collapse:collapse;"><tr><th style="${th}">Categoría</th><th style="${th}text-align:right;">Piezas</th><th style="${th}text-align:right;">Importe</th></tr>
                 ${Object.keys(byCat).map(c => `<tr><td style="${td}">${escapeHtmlText(c)}</td><td style="${tr}">${byCat[c].q}</td><td style="${tr}">${money(byCat[c].t)}</td></tr>`).join('')}</table>
@@ -6246,6 +6397,50 @@
             document.body.appendChild(wrap);
             try { await generatePDFFile(wrap.firstElementChild, btn, `Corte_del_dia_${day}.pdf`); }
             finally { wrap.remove(); }
+        }
+        function saveOwnerPhone(inp) {
+            const raw = (inp.value || '').trim();
+            if (!raw) { storeConfig.ownerPhone = ''; saveData(); return; }
+            const ph = normalizePhone(raw);
+            if (!ph) { showToast('El número del dueño no es válido (10 dígitos)', 'warning'); return; }
+            storeConfig.ownerPhone = ph; inp.value = ph.replace(/^52/, '');
+            saveData(); showToast('WhatsApp del dueño guardado', 'success');
+        }
+        async function sendCorteWhatsApp(btn) {
+            const inp = document.getElementById('corte-date');
+            const day = (inp && inp.value) || localDayKey();
+            const pin = document.getElementById('owner-phone-input');
+            if (pin && pin.value.trim() && normalizePhone(pin.value) !== storeConfig.ownerPhone) saveOwnerPhone(pin);
+            const phone = storeConfig.ownerPhone || '';
+            const money = n => '$' + (Number(n) || 0).toFixed(2);
+            const dayOf = s => s.closedAt ? (() => { const d = new Date(s.closedAt); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })() : '';
+            const sales = salesHistory.filter(x => dayOf(x) === day);
+            const total = sales.reduce((a, x) => a + x.total, 0);
+            const cash = sales.filter(x => x.method !== 'Transferencia').reduce((a, x) => a + x.total, 0);
+            const fecha = new Date(day + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            const text = `📊 Corte del día · ${storeConfig.businessName || 'Marisquería Pargo'}\n${fecha}\n\nVentas: ${money(total)}\nCuentas: ${sales.length}\nEfectivo: ${money(cash)}\nTransferencia: ${money(total - cash)}`;
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:fixed;left:-10000px;top:0;';
+            wrap.innerHTML = corteDiaHtml(day);
+            document.body.appendChild(wrap);
+            const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> PREPARANDO...';
+            try {
+                const fileName = `Corte_del_dia_${day}.pdf`;
+                const blob = await html2pdf().set({ margin: [8, 8, 8, 8], filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false }, jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'] } }).from(wrap.firstElementChild).outputPdf('blob');
+                const file = new File([blob], fileName, { type: 'application/pdf' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try { await navigator.share({ files: [file], title: 'Corte del día', text }); showToast('Corte compartido', 'success'); return; }
+                    catch (err) { if (err && err.name === 'AbortError') return; }
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+                if (phone) {
+                    const w = window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text + '\n\n📎 Te adjunto el corte en PDF.')}`, '_blank');
+                    showToast(w ? 'PDF descargado: adjúntalo en el chat de WhatsApp' : 'PDF descargado. Permite ventanas emergentes para abrir WhatsApp', 'info');
+                } else showToast('PDF descargado. Escribe el WhatsApp del dueño para abrir su chat', 'info');
+            } catch (e) { showToast('No se pudo preparar el corte', 'error'); }
+            finally { wrap.remove(); btn.disabled = false; btn.innerHTML = orig; }
         }
         function exportSalesCSV() {
             if (salesHistory.length === 0) {
@@ -6271,11 +6466,13 @@
             if (!isAdminUnlocked) { denyNeedsAdmin(); return; }
             if (confirm('¿Borrar TODAS las ventas y comprobantes, el historial de pedidos para llevar (web), reiniciar los totales de las meseras y los números de pedido (#001)? No se puede deshacer.')) {
                 salesHistory = [];
+                storeConfig.salesResetAt = new Date().toISOString();
+                setPendingSales([]);
                 staff.forEach(s => { s.salesCount = 0; s.salesTotal = 0; });
                 let msg = 'Ventas reiniciadas';
                 if (kitchenHasOpenTickets()) msg += '. Los números de pedido NO se reiniciaron porque hay pedidos pendientes en cocina';
-                else { storeConfig.kitchenSeq = 0; storeConfig.kitchenSeqDay = localDayKey(); msg += ' y pedidos en #001'; }
-                saveData(true);
+                else { storeConfig.kitchenSeq = 0; storeConfig.kitchenSeqDay = localDayKey(); storeConfig.webSeq = {}; storeConfig.webArrived = {}; msg += ' y pedidos en #001'; }
+                saveData();
                 try { if (window.llvClearHistory) window.llvClearHistory(); } catch (e) {}
                 renderAdminReports();
                 refreshAllTableViews();
@@ -6361,7 +6558,7 @@
                         catalog = data.catalog.map(p => ({ ...p, available: p.available !== false }));
                     }
                     if (Array.isArray(data.salesHistory)) {
-                        salesHistory = data.salesHistory.map(s => ({ ...s, method: s.method || 'Efectivo' }));
+                        salesHistory = mergeCloudSales(data.salesHistory, data.storeConfig).list;
                     }
                     if (data.storeConfig) {
                         storeConfig = { ...INITIAL_STORE_CONFIG, ...data.storeConfig };
@@ -6437,7 +6634,7 @@
                     try { cloudUnsubscribe(); } catch (e) {}
                 }
 
-                cloudUnsubscribe = docRef.onSnapshot((snap) => {
+                cloudUnsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, (snap) => {
                     // Ignorar el "eco" de nuestros propios cambios aún no confirmados: traía datos viejos y hacía desaparecer lo recién agregado
                     if (snap.metadata && snap.metadata.hasPendingWrites) return;
                     // Si este teléfono hizo cambios sin internet, no dejar que la nube los pise antes de subirlos
@@ -6453,6 +6650,9 @@
                     }
                     const data = snap.data();
                     if (!data) return;
+                    // Mismo dato que ya aplicamos (solo cambió el estado de confirmación): no se vuelve a pintar todo
+                    if (data.updatedAt && data.updatedAt === lastCloudAppliedAt) return;
+                    lastCloudAppliedAt = data.updatedAt || '';
                     cloudSyncStatus = { state: 'ok', msg: 'En vivo' };
 
                     isApplyingCloudUpdate = true;
@@ -6463,7 +6663,10 @@
                         catalog = data.catalog.map(p => ({ ...p, available: p.available !== false }));
                     }
                     if (Array.isArray(data.salesHistory)) {
-                        salesHistory = data.salesHistory.map(s => ({ ...s, method: s.method || 'Efectivo' }));
+                        const _ms = mergeCloudSales(data.salesHistory, data.storeConfig);
+                        salesHistory = _ms.list;
+                        // Si este dispositivo tiene ventas que la nube no trae, se vuelven a subir
+                        if (_ms.pushBack && !customerLockedMesaCode) setTimeout(() => { try { pushStateToFirestore(true); } catch (e) {} }, 500);
                     }
                     if (data.storeConfig) {
                         storeConfig = { ...INITIAL_STORE_CONFIG, ...data.storeConfig };
@@ -6998,11 +7201,7 @@
          class="px-3 py-1.5 rounded-full text-[11px] font-extrabold bg-rose-600/95 text-white border border-rose-300/40 shadow-lg text-center">
         <i class="fa-solid fa-wifi"></i> Sin internet · sigues trabajando, se sincroniza al volver
     </div>
-    <!-- Botón instalar app -->
-    <button id="pwa-install-btn" type="button" style="display:none;position:fixed;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:9998;"
-            class="px-3 py-2 rounded-full text-xs font-extrabold bg-amber-500 text-slate-900 shadow-lg border border-amber-300">
-        <i class="fa-solid fa-download"></i> Instalar app
-    </button>
+    <!-- El botón "Instalar" ahora está en la barra de arriba, junto a Admin / Caja -->
 
     <script>
         (function () {
@@ -7021,10 +7220,17 @@
             function flushOfflineChanges() {
                 if (window.__LLEVAR || localStorage.getItem('pargo_offline_dirty') !== '1') return;
                 if (typeof cloudDb === 'undefined' || !cloudDb || typeof FIRESTORE_ROOM_DOC === 'undefined') return;
-                cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC).set({
-                    tables: tables, staff: staff, catalog: catalog, salesHistory: salesHistory, storeConfig: storeConfig,
-                    updatedAt: new Date().toISOString()
-                }, { merge: true }).then(function () {
+                var ref = cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC);
+                ref.get({ source: 'server' }).then(function (snap) { return snap; }, function () { return null; }).then(function (snap) {
+                    try {
+                        var d = snap && snap.exists ? snap.data() : null;
+                        if (d && Array.isArray(d.salesHistory)) salesHistory = mergeCloudSales(d.salesHistory, d.storeConfig).list;
+                    } catch (e) {}
+                    return ref.set({
+                        tables: tables, staff: staff, catalog: catalog, salesHistory: salesHistory, storeConfig: storeConfig,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                }).then(function () {
                     localStorage.removeItem('pargo_offline_dirty');
                     updateCloudPill('Nube Activa', true);
                     showToast('Cambios hechos sin internet ya se sincronizaron', 'success');
@@ -7046,14 +7252,14 @@
             var deferred = null, btn = document.getElementById('pwa-install-btn');
             window.addEventListener('beforeinstallprompt', function (e) {
                 e.preventDefault(); deferred = e;
-                if (!isCustomer && !standalone && btn) btn.style.display = 'block';
+                if (!isCustomer && !standalone && btn) { btn.style.display = 'flex'; document.documentElement.classList.add('pwa-can'); }
             });
             if (btn) btn.addEventListener('click', function () {
                 if (!deferred) return;
                 deferred.prompt();
-                deferred.userChoice.finally(function () { deferred = null; btn.style.display = 'none'; });
+                deferred.userChoice.finally(function () { deferred = null; btn.style.display = 'none'; document.documentElement.classList.remove('pwa-can'); });
             });
-            window.addEventListener('appinstalled', function () { if (btn) btn.style.display = 'none'; });
+            window.addEventListener('appinstalled', function () { if (btn) btn.style.display = 'none'; document.documentElement.classList.remove('pwa-can'); });
 
             // iPhone/iPad: no hay botón automático, se avisa una sola vez
             var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -7068,7 +7274,7 @@
     </script>
     <!-- ===== Pedidos para llevar ===== -->
     <div id="llevar-root" style="display:none"></div>
-    <button id="llevar-fab" type="button" style="display:none;position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:9997;" class="px-3 py-2 rounded-full text-xs font-extrabold bg-sky-500 text-white shadow-lg border border-sky-300"><i class="fa-solid fa-bag-shopping"></i> Para llevar <span id="llevar-badge" class="ml-1 px-1.5 rounded-full bg-rose-600 text-white" style="display:none"></span></button>
+    <!-- El botón "Para llevar" ahora está en la barra de arriba, junto a Vista Cliente -->
     <div id="llevar-panel" style="display:none;position:fixed;inset:0;z-index:99990;background:#020814;overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 12px 80px" class="text-white"></div>
     <script>
     (function () {
@@ -7466,25 +7672,52 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         function inSt(o, list) { return list.indexOf(o.status) >= 0; }
         var S_NUEVO = ['nuevo'], S_COCINA = ['cocina', 'preparando'], S_ENTREGA = ['cocinado', 'listo'], S_HIST = ['entregado', 'cancelado'];
         function mine() { // estados que requieren atención de este rol
-            var r = role(); return r === 'cocina' ? ['cocina', 'preparando'] : r === 'mesero' ? ['nuevo', 'cocinado'] : ['nuevo', 'cocinado'];
+            var r = role(); return r === 'cocina' ? ['cocina', 'preparando'] : r === 'mesero' ? [] : ['nuevo', 'cocinado'];
         }
         function badge() {
             var n = orders.filter(function (o) { return inSt(o, mine()); }).length, b = document.getElementById('llevar-badge');
             b.textContent = n; b.style.display = n ? 'inline-block' : 'none';
+            if (started) fab.style.display = role() === 'mesero' ? 'none' : 'flex';
             fab.style.background = n ? '#e11d48' : '';
         }
         function upd(id, f) { f.updatedAt = new Date().toISOString(); return cloudDb.collection(COL).doc(id).update(f).catch(function (e) { console.error('pargo_llevar update', e); showToast('No se pudo actualizar el pedido' + (e && e.code ? ' (' + e.code + ')' : ''), 'error'); }); }
         window.llvSet = function (id, st) {
             if (st === 'cancelado' && !confirm('¿Cancelar este pedido?')) return;
             var f = { status: st }, now = new Date().toISOString();
-            if (st === 'cocina') f.acceptedAt = now; if (st === 'cocinado') f.cookedAt = now; if (st === 'listo') f.readyAt = now;
+            if (st === 'cocina') { f.acceptedAt = now; try { assignWebSeq(id); } catch (e) {} } if (st === 'cocinado') f.cookedAt = now; if (st === 'listo') f.readyAt = now;
             upd(id, f);
         };
+        // Recupera ventas de pedidos para llevar ya cobrados que no quedaron en Caja (solo el admin, solo si el pedido sigue en la lista)
+        var recovering = false;
+        function recoverSales() {
+            try {
+                if (recovering || !isAdmin() || typeof isAdminUnlocked === 'undefined' || !isAdminUnlocked) return;
+                if (typeof cloudSyncStatus === 'undefined' || cloudSyncStatus.state !== 'ok') return;
+                var resetAt = (storeConfig && storeConfig.salesResetAt) || '', n = 0;
+                orders.forEach(function (o) {
+                    if (o.status !== 'entregado' || !o.paidAt || !o.code) return;
+                    if (resetAt && o.paidAt < resetAt) return;
+                    var sid = 'LL-' + o.code;
+                    if (salesHistory.some(function (x) { return x.id === sid; })) return;
+                    var its = (o.items || []).map(function (i) { return { sku: i.sku || '', name: i.name, price: priceOf(i), qty: i.qty, notes: i.note || '' }; });
+                    salesHistory.push({ id: sid, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date(o.paidAt).toLocaleTimeString('es-MX'), closedAt: o.paidAt, method: o.method || 'Efectivo', guests: 0, phone: o.phone || '', proof: '', partial: false, items: its, total: totalOf(o) });
+                    markSalePending(sid); n++;
+                });
+                if (!n) return;
+                recovering = true;
+                salesHistory.sort(function (a, b) { return String(b.closedAt || '').localeCompare(String(a.closedAt || '')); });
+                saveData(); try { renderAdminReports(); } catch (e) {}
+                showToast('Se recuperaron ' + n + ' venta(s) de pedidos para llevar que no estaban en Caja', 'success');
+                setTimeout(function () { recovering = false; }, 3000);
+            } catch (e) { console.error('recoverSales', e); }
+        }
         window.llvPay = function (id, method) {
             var o = orders.find(function (x) { return x._id === id; }); if (!o || o.status === 'entregado') return;
+            if (o.status !== 'cocinado' && o.status !== 'listo') { showToast('No se puede cobrar: cocina aún no termina este pedido', 'warning'); return; }
+            if (!webArrivedGet(id)) { showToast('No se puede cobrar: marca primero que el cliente llegó', 'warning'); return; }
             var its = o.items.map(function (i) { return { sku: i.sku || '', name: i.name, price: priceOf(i), qty: i.qty, notes: i.note || '' }; });
             salesHistory.unshift({ id: 'LL-' + o.code, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date().toLocaleTimeString('es-MX'), closedAt: new Date().toISOString(), method: method, guests: 0, phone: o.phone, proof: '', partial: false, items: its, total: totalOf(o) });
-            saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success');
+            markSalePending('LL-' + o.code); saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success');
         };
         // Reiniciar ventas: borra también el "Historial de hoy" de pedidos para llevar (entregados y cancelados). Los pendientes NO se tocan.
         window.llvClearHistory = async function () {
@@ -7521,9 +7754,10 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         }
         function alertInfo(o) {
             var r = role(), who = '#' + esc(o.code) + ' · ' + esc(o.name);
+            if (r === 'mesero') return null;
             if (o.status === 'nuevo' && r !== 'cocina') return { c: '#0284c7', t: '🆕 ¡Nuevo pedido para llevar!', m: who + ' · ' + (o.items || []).length + ' producto(s)' + (r === 'admin' ? ' · ' + $m(totalOf(o)) : '') };
-            if ((o.status === 'cocina' || o.status === 'preparando') && r === 'cocina') return { c: '#d97706', t: '🔥 ¡Pedido nuevo para cocinar!', m: who };
-            if (o.status === 'cocinado' && r !== 'cocina') return { c: '#db2777', t: '🍽️ ¡Cocina terminó un pedido!', m: who + (r === 'admin' ? ' · avisa al cliente que ya puede pasar' : ' · llévalo al mostrador') };
+            if (false && (o.status === 'cocina' || o.status === 'preparando') && r === 'cocina') return { c: '#d97706', t: '🔥 ¡Pedido nuevo para cocinar!', m: who };
+            if (o.status === 'cocinado' && r === 'admin') return { c: '#db2777', t: '🍽️ ¡Cocina terminó un pedido!', m: who + (r === 'admin' ? ' · avisa al cliente que ya puede pasar' : ' · llévalo al mostrador') };
             return null;
         }
         function drawAlerts() {
@@ -7536,6 +7770,28 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             }).join('') + (ids.length > 1 ? '<button onclick="llvAckAll()" style="padding:10px 16px;border-radius:12px;background:#334155;color:#fff;font-weight:800">Entendido todos (' + ids.length + ')</button>' : '');
             if (!alertIv) alertIv = setInterval(function () { if (Object.keys(alerts).length) chime(); }, 6000);
         }
+        // Recordatorio cada 20 s con voz hasta que el pedido de la web se atienda (cambia de estado)
+        setInterval(function () {
+            try {
+                if (CUST || !orders.length) return;
+                if (typeof storeConfig !== 'undefined' && storeConfig.soundAlerts === false) return;
+                var r = role(), nuevos = 0, cocinar = 0, listos = 0;
+                orders.forEach(function (o) {
+                    if (o.status === 'nuevo' && r === 'admin') nuevos++;
+                    else if (o.status === 'cocinado' && r === 'admin') listos++;
+                });
+                var msg = nuevos ? 'Pedido de la web sin aceptar' : cocinar ? 'Pedido de la web por cocinar' : listos ? 'Pedido de la web listo, avisa al cliente' : '';
+                if (!msg) return;
+                chime();
+                if (typeof alertSpeak === 'function') setTimeout(function () { alertSpeak(msg); }, 1300);
+            } catch (e) {}
+        }, 20000);
+        window.llvKitchenOrders = function () {
+            var q = (typeof storeConfig !== 'undefined' && storeConfig.webSeq) || {};
+            return orders.filter(function (o) { return (o.status === 'cocina' || o.status === 'preparando') && q[o._id]; }).map(function (o) { return { id: o._id, name: o.name, n: q[o._id], at: o.acceptedAt || o.createdAt }; });
+        };
+        function seqTag(o) { var q = (typeof storeConfig !== 'undefined' && storeConfig.webSeq || {})[o._id]; return q ? '<span style="color:#fbbf24">' + kitchenNumLabel(q) + ' · WEB</span> ' : ''; }
+        window.llvArrived = function (id) { webArrivedSet(id); render(); showToast('Cliente marcado como llegado', 'success'); };
         window.llvAck = function (k, view) { delete alerts[k]; drawAlerts(); if (view) { open = true; panel.style.display = 'block'; try { localStorage.setItem('llv_open', '1'); } catch (e) {} render(); } };
         window.llvAckAll = function () { alerts = {}; drawAlerts(); };
         function considerAlerts(initial) {
@@ -7562,7 +7818,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             return '<div style="border:1px solid ' + edge + ';border-left:6px solid ' + edge + ';border-radius:14px;padding:14px;background:#0f172a;' + (late ? 'box-shadow:0 8px 24px -12px #ef4444;' : '') + '">' +
                 (late ? '<div style="margin:-4px -4px 10px;padding:6px 10px;border-radius:8px;background:#7f1d1d;color:#fecaca;font-size:12px;font-weight:800">⚠️ Lleva ' + m + ' min en este paso</div>' : '') +
                 '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span style="padding:4px 10px;border-radius:9999px;background:' + col + '22;color:' + col + ';border:1px solid ' + col + '66;font-size:11px;font-weight:900;letter-spacing:.04em">' + stl + '</span><span style="padding:4px 10px;border-radius:9999px;background:' + tcol + '22;color:' + tcol + ';font-size:13px;font-weight:900">⏱ ' + m + ' min</span></div>' +
-                '<div style="margin-top:10px;font-size:20px;font-weight:900;color:#fff">#' + esc(o.code) + ' · ' + esc(o.name) + '</div>' +
+                '<div style="margin-top:10px;font-size:20px;font-weight:900;color:#fff">' + seqTag(o) + '#' + esc(o.code) + ' · ' + esc(o.name) + '</div>' +
                 '<div style="font-size:12px;color:#94a3b8;margin-top:2px">📞 <a href="tel:' + esc(o.phone) + '" style="color:#7dd3fc">' + esc(o.phone) + '</a> · Pedido a las ' + hora(o.createdAt) + '</div>' +
                 '<div style="margin:10px 0;border-top:1px solid #1e293b">' + (o.items || []).map(function (i) { return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #1e293b"><span style="min-width:34px;text-align:center;padding:2px 0;border-radius:8px;background:#1e293b;color:#fbbf24;font-weight:900;font-size:14px">' + i.qty + '×</span><div style="flex:1;font-size:15px;font-weight:700;color:#f1f5f9">' + esc(i.name) + (i.note ? '<div style="font-size:12px;color:#fbbf24;font-weight:700">📝 ' + esc(i.note) + '</div>' : '') + '</div></div>'; }).join('') + '</div>' +
                 (o.notes ? '<div style="font-size:12px;color:#fde68a;background:#422006;border-radius:8px;padding:6px 10px;margin-bottom:8px">📝 Nota del cliente: ' + esc(o.notes) + '</div>' : '') +
@@ -7574,7 +7830,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 (o.status === 'cocinado' ? '<span style="' + bt + 'background:#500724;color:#f9a8d4">🍽️ Cocina ya terminó</span>' : '') +
                 (adm && o.status === 'cocinado' ? '<button onclick="llvSet(\'' + o._id + '\',\'listo\')" style="' + bt + 'background:#059669">📣 Ya pueden pasar por él</button>' : '') +
                 (role() !== 'cocina' && o.status === 'listo' ? '<a href="https://wa.me/' + (typeof normalizePhone === 'function' && normalizePhone(o.phone) || '52' + o.phone) + '?text=' + encodeURIComponent('Hola ' + o.name + ', tu pedido #' + o.code + ' de Marisquería PARGO ya está listo para recoger.') + '" target="_blank" style="' + bt + 'background:#16a34a;color:#fff">Avisar por WhatsApp</a>' : '') +
-                (adm && inSt(o, S_ENTREGA.concat(S_COCINA, S_NUEVO)) ? '<button onclick="llvPay(\'' + o._id + '\',\'Efectivo\')" style="' + bt + 'background:#0ea5e9">Cobrar efectivo</button><button onclick="llvPay(\'' + o._id + '\',\'Transferencia\')" style="' + bt + 'background:#6366f1">Cobrar transf.</button>' : '') +
+                (adm && inSt(o, S_ENTREGA.concat(S_COCINA, S_NUEVO)) ? (webArrivedGet(o._id) ? '<span style="' + bt + 'background:#064e3b;color:#6ee7b7">✔ Cliente llegó</span>' : '<button onclick="llvArrived(\'' + o._id + '\')" style="' + bt + 'background:#7c3aed">🙋 Cliente llegó</button>') + ((o.status === 'cocinado' || o.status === 'listo') && webArrivedGet(o._id) ? '<button onclick="llvPay(\'' + o._id + '\',\'Efectivo\')" style="' + bt + 'background:#0ea5e9">Cobrar efectivo</button><button onclick="llvPay(\'' + o._id + '\',\'Transferencia\')" style="' + bt + 'background:#6366f1">Cobrar transf.</button>' : '<span style="' + bt + 'background:#1e293b;color:#fca5a5">🔒 Para cobrar falta: ' + [(o.status === 'cocinado' || o.status === 'listo') ? '' : 'que cocina termine', webArrivedGet(o._id) ? '' : 'que el cliente llegue'].filter(Boolean).join(' y ') + '</span>') : '') +
                 (adm ? '<button onclick="llvSet(\'' + o._id + '\',\'cancelado\')" style="' + bt + 'background:#7f1d1d">Cancelar</button>' : '') + '</div></div>';
         }
         function section(title, color, list, adm, bt) {
@@ -7620,21 +7876,22 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             var d = document.createElement('div'); d.id = 'llv-kitchen'; d.style.cssText = 'grid-column:1/-1;margin-bottom:6px';
             d.innerHTML = '<h3 style="font-size:14px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px">🥡 Pedidos para llevar (' + list.length + ')</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">' + list.map(function (o) {
                 var mn = mins(o, 'acceptedAt');
+                var bl = (typeof window.kitchenWebBlocker === 'function') ? window.kitchenWebBlocker(o._id) : null;
                 var tk = ticksGet(o._id), falta = (o.items || []).filter(function (_, ix) { return tk.indexOf(ix) < 0; }).length;
-                return '<div style="border:2px solid #38bdf8;border-radius:16px;padding:12px;background:#0f172a"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:26px;color:#fbbf24">#' + esc(o.code) + '</b><span style="font-size:12px;color:#94a3b8">' + esc(o.name) + ' · ' + mn + ' min</span></div><ul style="margin:8px 0;list-style:none;padding:0">' + o.items.map(function (i, ix) { var on = tk.indexOf(ix) >= 0; return '<li onclick="llvTick(\'' + o._id + '\',' + ix + ')" style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b;font-size:16px;font-weight:800;color:' + (on ? '#64748b' : '#fff') + ';cursor:pointer;' + (on ? 'text-decoration:line-through;' : '') + '"><span style="flex:0 0 26px;height:26px;border-radius:8px;border:2px solid ' + (on ? '#10b981' : '#64748b') + ';background:' + (on ? '#10b981' : 'transparent') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px">' + (on ? '✓' : '') + '</span><span>' + i.qty + '× ' + esc(i.name) + (i.note ? '<span style="display:inline-block;margin-left:6px;padding:1px 8px;border-radius:8px;background:#fbbf24;color:#0f172a;font-size:12px;font-weight:900;text-decoration:none">📝 ' + esc(i.note) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' + (o.notes ? '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px">Nota: ' + esc(o.notes) + '</div>' : '') + (falta ? '<button disabled style="width:100%;padding:12px;border-radius:12px;background:#334155;color:#94a3b8;font-weight:900;font-size:14px">Faltan ' + falta + ' por marcar</button>' : '<button onclick="llvKitchenDone(\'' + o._id + '\')" style="width:100%;padding:12px;border-radius:12px;background:#059669;color:#fff;font-weight:900;font-size:14px">✅ ¡LISTO!</button>') + '</div>';
+                return '<div style="border:2px solid #38bdf8;border-radius:16px;padding:12px;background:#0f172a"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:26px;color:#fbbf24">' + seqTag(o) + '#' + esc(o.code) + '</b><span style="font-size:12px;color:#94a3b8">' + esc(o.name) + ' · ' + mn + ' min</span></div><ul style="margin:8px 0;list-style:none;padding:0">' + o.items.map(function (i, ix) { var on = tk.indexOf(ix) >= 0; return '<li ' + (bl ? '' : 'onclick="llvTick(\'' + o._id + '\',' + ix + ')"') + ' style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b;font-size:16px;font-weight:800;color:' + (on ? '#64748b' : '#fff') + ';cursor:pointer;' + (on ? 'text-decoration:line-through;' : '') + '"><span style="flex:0 0 26px;height:26px;border-radius:8px;border:2px solid ' + (on ? '#10b981' : '#64748b') + ';background:' + (on ? '#10b981' : 'transparent') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px">' + (on ? '✓' : '') + '</span><span>' + i.qty + '× ' + esc(i.name) + (i.note ? '<span style="display:inline-block;margin-left:6px;padding:1px 8px;border-radius:8px;background:#fbbf24;color:#0f172a;font-size:12px;font-weight:900;text-decoration:none">📝 ' + esc(i.note) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' + (o.notes ? '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px">Nota: ' + esc(o.notes) + '</div>' : '') + (bl ? '<div style="text-align:center;padding:10px;border-radius:12px;background:#422006;color:#fcd34d;font-weight:900;font-size:13px">⏳ En espera · primero termina ' + kitchenNumLabel(bl.k.n) + ' (' + esc(bl.t.name) + ')</div>' : falta ? '<button disabled style="width:100%;padding:12px;border-radius:12px;background:#334155;color:#94a3b8;font-weight:900;font-size:14px">Faltan ' + falta + ' por marcar</button>' : '<button onclick="llvKitchenDone(\'' + o._id + '\')" style="width:100%;padding:12px;border-radius:12px;background:#059669;color:#fff;font-weight:900;font-size:14px">✅ ¡LISTO!</button>') + '</div>';
             }).join('') + '</div>';
             board.insertBefore(d, board.firstChild);
         };
         fab.onclick = function () { open = true; panel.style.display = 'block'; try { localStorage.setItem('llv_open', '1'); } catch (e) {} try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {} render(); };
-        setInterval(function () { if (open) render(); badge(); }, 30000);
+        setInterval(function () { if (open) render(); badge(); recoverSales(); }, 30000);
         var wait = setInterval(function () {
             if (started || typeof cloudDb === 'undefined' || !cloudDb) return;
-            started = true; clearInterval(wait); fab.style.display = 'block';
+            started = true; clearInterval(wait); fab.style.display = 'flex'; document.documentElement.classList.add('llv-ready');
             try { if (localStorage.getItem('llv_open') === '1') { open = true; panel.style.display = 'block'; } } catch (e) {}
             cloudDb.collection(COL).orderBy('createdAt', 'desc').limit(60).onSnapshot(function (s) {
                 var cut = Date.now() - 36 * 3600 * 1000;
                 orders = s.docs.map(function (d) { return Object.assign({ _id: d.id }, d.data()); }).filter(function (o) { return !o.cleared && new Date(o.createdAt).getTime() > cut; });
-                badge(); considerAlerts(); render(); try { renderKitchenView(); } catch (e) {}
+                badge(); considerAlerts(); render(); try { renderKitchenView(); } catch (e) {} recoverSales();
             }, function (e) { console.error('pargo_llevar listen', e); });
         }, 1000);
     })();
