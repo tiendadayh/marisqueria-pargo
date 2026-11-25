@@ -1092,14 +1092,60 @@
 
     <!-- ================= MODALES OPERATIVOS ================= -->
 
-    <!-- MODAL CONTRASEÑA ADMIN -->
+    <style>
+/* Login: logo grande, recuadro compacto para que quepa completo */
+#admin-auth-card{padding:18px 26px 16px!important}
+#admin-auth-card > .text-center{margin-bottom:6px!important}
+#admin-auth-card h3{margin-top:6px!important;line-height:1.1}
+#admin-auth-card form{margin-top:0}
+#admin-auth-card form > *{margin-top:8px!important;margin-bottom:0!important}
+#admin-auth-card label{margin-bottom:4px!important}
+#admin-auth-card input{padding-top:9px!important;padding-bottom:9px!important}
+/* Login de administrador: sin ninguna barra de desplazamiento (ni arriba/abajo ni a los lados) */
+#modal-admin-auth{overflow:hidden!important;scrollbar-width:none!important;-ms-overflow-style:none;overscroll-behavior:contain}
+#modal-admin-auth::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+/* Mientras está abierto, la página de atrás no se mueve ni muestra sus barras */
+html.admin-auth-open, html.admin-auth-open body, html.admin-auth-open *{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html.admin-auth-open, html.admin-auth-open body{overflow:hidden!important}
+html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+</style>
+<script>
+(function () {
+    /* Abre/cierra el modo "sin barras" y, solo si la pantalla es muy chica, encoge un poco el recuadro para que quepa completo */
+    function fit() {
+        var m = document.getElementById('modal-admin-auth'); if (!m) return;
+        var box = m.firstElementChild; if (!box) return;
+        box.style.zoom = '';
+        if (m.classList.contains('hidden')) return;
+        var vis = window.innerHeight;
+        try { var v2 = screen.availHeight - window.screenY - (window.outerHeight - window.innerHeight); if (v2 > 250 && v2 < vis) vis = v2; } catch (e) {}
+        var r = box.getBoundingClientRect(), maxH = vis - 16, maxW = window.innerWidth - 16;
+        var z = Math.min(1, maxH / r.height, maxW / r.width);
+        if (z < 1) box.style.zoom = String(Math.max(0.5, z));
+    }
+    function sync() {
+        var m = document.getElementById('modal-admin-auth'); if (!m) return;
+        var open = !m.classList.contains('hidden');
+        document.documentElement.classList.toggle('admin-auth-open', open);
+        if (open) { fit(); setTimeout(fit, 60); }
+    }
+    function init() {
+        var m = document.getElementById('modal-admin-auth'); if (!m) return;
+        new MutationObserver(sync).observe(m, { attributes: true, attributeFilter: ['class'] });
+        window.addEventListener('resize', fit);
+        sync();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+<!-- MODAL CONTRASEÑA ADMIN -->
     <div id="modal-admin-auth" class="fixed inset-0 z-[60] hidden items-center justify-center p-4 overflow-y-auto" style="background:radial-gradient(ellipse at 20% 10%,rgba(249,115,22,.25),transparent 55%),radial-gradient(ellipse at 85% 90%,rgba(14,165,233,.22),transparent 55%),#020617;">
         <div class="relative w-full max-w-sm my-auto">
             <div class="absolute -inset-0.5 rounded-[1.75rem] opacity-70 blur-md" style="background:linear-gradient(135deg,#f97316,#fbbf24,#0ea5e9);"></div>
-            <div class="relative bg-slate-900/95 border border-slate-700/70 rounded-3xl p-7 shadow-2xl backdrop-blur">
+            <div id="admin-auth-card" class="relative bg-slate-900/95 border border-slate-700/70 rounded-3xl p-7 shadow-2xl backdrop-blur">
                 <button type="button" onclick="cancelAdminAuthModal()" class="absolute top-3 right-4 text-slate-500 hover:text-white text-xl" title="Cerrar">&times;</button>
                 <div class="text-center mb-5">
-                    <div class="w-20 h-20 mx-auto rounded-full p-1" style="background:linear-gradient(135deg,#f97316,#fbbf24);box-shadow:0 0 30px rgba(249,115,22,.45);">
+                    <div class="mx-auto rounded-full p-1" style="width:124px;height:124px;background:linear-gradient(135deg,#f97316,#fbbf24);box-shadow:0 0 30px rgba(249,115,22,.45);">
                         <img id="admin-login-logo" alt="" class="w-full h-full rounded-full object-cover bg-slate-950">
                     </div>
                     <h3 class="mt-3 text-xl font-black text-white tracking-tight">Marisquería Pargo</h3>
@@ -2545,7 +2591,7 @@
             localStorage.setItem('pargo_pro_v3_sales', JSON.stringify(salesHistory));
             localStorage.setItem('pargo_pro_v3_config', JSON.stringify(storeConfig));
 
-            if (!skipCloud && !isApplyingCloudUpdate && !customerLockedMesaCode && !navigator.onLine) {
+            if (!skipCloud && !isApplyingCloudUpdate && !customerLockedMesaCode && (!navigator.onLine || (window.__net && !window.__net.online))) {
                 try { localStorage.setItem('pargo_offline_dirty', '1'); } catch (e) {}
             }
             if (!skipCloud && !isApplyingCloudUpdate && cloudDb) {
@@ -4096,13 +4142,17 @@
         }
 
         async function updateTableRemote(tableId, patch) {
+            if (window.__net && !window.__net.online) {
+                showToast('Sin internet: no se pudo enviar. Avisa a tu mesera o inténtalo cuando vuelva la conexión.', 'error');
+                return false;
+            }
             const t = tables.find(x => x.id === tableId);
             if (t) Object.assign(t, patch);
             saveData(true);
             refreshAllTableViews();
             if (!cloudDb) {
                 showToast('Sin conexión con el restaurante', 'error');
-                return;
+                return false;
             }
             try {
                 const ref = cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC);
@@ -4115,7 +4165,9 @@
                 });
             } catch (e) {
                 showToast('No se pudo avisar a la mesera. Intenta de nuevo o llámala.', 'error');
+                return false;
             }
+            return true;
         }
 
         function cancelBillRequest(tableId) {
@@ -7110,7 +7162,8 @@
                 if (data.length > 160000) data = await compressImageFile(file, 640, 0.45);
                 const proof = { image: data, at: new Date().toISOString(), status: 'pending' };
                 if (customerLockedMesaCode) {
-                    await updateTableRemote(table.id, { transferProof: proof });
+                    const okProof = await updateTableRemote(table.id, { transferProof: proof });
+                    if (okProof === false) return;
                     showToast('¡Listo! Enviamos tu comprobante al restaurante', 'success');
                     return;
                 }
@@ -7264,11 +7317,79 @@
             }, 3500);
         }
     </script>
-    <!-- Aviso sin internet -->
-    <div id="offline-banner" style="display:none;position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);z-index:99999;max-width:92vw;pointer-events:none;"
-         class="px-3 py-1.5 rounded-full text-[11px] font-extrabold bg-rose-600/95 text-white border border-rose-300/40 shadow-lg text-center">
-        <i class="fa-solid fa-wifi"></i> Sin internet · sigues trabajando, se sincroniza al volver
-    </div>
+    <!-- Aviso sin internet (lo maneja el monitor de conexión de abajo; un texto distinto por vista) -->
+    <div id="offline-banner" role="status" aria-live="polite" style="display:none;position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);z-index:99999;width:max-content;max-width:94vw;pointer-events:none;padding:7px 14px;border-radius:16px;font:800 12px/1.35 Inter,system-ui,sans-serif;color:#fff;background:rgba(225,29,72,.96);border:1px solid rgba(253,164,175,.45);box-shadow:0 6px 18px rgba(0,0,0,.35);text-align:center;"><span id="offline-banner-text"></span></div>
+    <style>html.is-offline #llv-send{opacity:.55}</style>
+    <script>
+    /* ===== Monitor de conexión: admin, mesero, cocina, pedidos (para llevar) y cliente =====
+       - Detecta si REALMENTE hay internet (no solo si el Wi-Fi está prendido): revisa cada 15 s.
+       - Muestra un aviso distinto según la vista y avisa cuando vuelve la conexión.
+       - Deja el estado en window.__net = { online, view } y lanza el evento "net-change". */
+    (function () {
+        var Q = new URLSearchParams(location.search), V = (Q.get('vista') || '').trim().toLowerCase();
+        var view = Q.get('mesa') ? 'cliente' : V === 'llevar' ? 'pedidos' : V === 'cocina' ? 'cocina' : V === 'mesero' ? 'mesero' : 'admin';
+        var MSG = {
+            admin:   '📡 Sin internet · sigues cobrando y pidiendo; se guarda en este dispositivo y se sube al volver. No llegarán pedidos de clientes ni de Para llevar.',
+            mesero:  '📡 Sin internet · tus pedidos se guardan en este celular. La cocina y el admin NO los verán hasta que vuelva el internet.',
+            cocina:  '📡 Sin internet · ves los últimos pedidos guardados. Los pedidos nuevos de las meseras no llegarán hasta que vuelva.',
+            cliente: '📡 Sin internet · no se pueden enviar pedidos ni comprobantes. Avisa a tu mesera o espera a que vuelva la conexión.',
+            pedidos: '📡 Sin internet · no se puede enviar ni consultar tu pedido. Revisa tu conexión e intenta de nuevo.'
+        };
+        window.__net = { online: navigator.onLine !== false, view: view };
+        var showOk = false, okTimer = null, fails = 0, checking = false, timer = null;
+
+        function paint() {
+            var b = document.getElementById('offline-banner'), tx = document.getElementById('offline-banner-text');
+            if (!b || !tx) return;
+            if (!window.__net.online) { tx.textContent = MSG[view]; b.style.background = 'rgba(225,29,72,.96)'; b.style.display = 'block'; }
+            else if (showOk) { tx.textContent = '✅ Volvió el internet' + (view === 'cliente' || view === 'pedidos' ? '' : ' · sincronizando…'); b.style.background = 'rgba(5,150,105,.96)'; b.style.display = 'block'; }
+            else b.style.display = 'none';
+        }
+        function setState(on) {
+            if (window.__net.online === on) return;
+            window.__net.online = on;
+            document.documentElement.classList.toggle('is-offline', !on);
+            clearTimeout(okTimer); showOk = false;
+            if (!on) {
+                try { if (typeof updateCloudPill === 'function') updateCloudPill('Sin internet', false); } catch (e) {}
+                try { if ((view === 'mesero' || view === 'cocina') && navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+            } else {
+                showOk = true; okTimer = setTimeout(function () { showOk = false; paint(); }, 4000);
+                // Que el resto del sistema (nube, subir cambios hechos sin internet) reaccione igual que con un "online" normal
+                try { window.dispatchEvent(new Event('online')); } catch (e) {}
+            }
+            paint();
+            try { window.dispatchEvent(new CustomEvent('net-change', { detail: { online: on, view: view } })); } catch (e) {}
+        }
+        function ping(url, ms) {
+            return new Promise(function (res) {
+                var done = false, c = ('AbortController' in window) ? new AbortController() : null;
+                function fin(v) { if (done) return; done = true; clearTimeout(t); res(v); }
+                var t = setTimeout(function () { try { if (c) c.abort(); } catch (e) {} fin(false); }, ms);
+                fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + '_=' + Date.now(), { mode: 'no-cors', cache: 'no-store', signal: c ? c.signal : undefined })
+                    .then(function () { fin(true); }, function () { fin(false); });
+            });
+        }
+        function check() {
+            if (checking) return;
+            if (navigator.onLine === false) { fails = 2; setState(false); return; }
+            checking = true;
+            ping('https://www.gstatic.com/generate_204', 6000)
+                .then(function (ok) { return ok ? true : ping('https://firestore.googleapis.com/', 6000); })
+                .then(function (ok) {
+                    checking = false;
+                    if (ok) { fails = 0; setState(true); }
+                    else { fails++; if (fails >= 2) setState(false); else setTimeout(check, 4000); }
+                });
+        }
+        window.addEventListener('offline', function () { fails = 2; setState(false); });
+        window.addEventListener('online', check);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+        window.addEventListener('focus', check);
+        window.addEventListener('load', function () { paint(); check(); if (!timer) timer = setInterval(check, 15000); });
+        if (document.readyState === 'complete') { paint(); check(); if (!timer) timer = setInterval(check, 15000); }
+    })();
+    </script>
     <!-- El botón "Instalar" ahora está en la barra de arriba, junto a Admin / Caja -->
 
     <script>
@@ -7306,7 +7427,7 @@
             }
             function setOnlineUI() {
                 var on = navigator.onLine;
-                if (banner && !isCustomer) banner.style.display = on ? 'none' : 'block';
+                /* el aviso lo pinta el monitor de conexión */
                 try {
                     if (!on) updateCloudPill('Sin internet', false);
                     else if (typeof cloudDb !== 'undefined' && cloudDb) { updateCloudPill('Nube Activa', true); flushOfflineChanges(); }
@@ -7462,8 +7583,16 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
  .lv-brand b{font-size:22px}
  .lv-brand small{font-size:13px}
  .lv-info-top{display:block}
- .lv-layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:26px;align-items:start}
- .lv-side{position:sticky;top:150px;max-height:calc(100vh - 170px);overflow-y:auto}
+ .lv-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;align-items:start}
+ .lv-side{position:sticky;top:150px;max-height:calc(100vh - 170px);overflow-y:auto;font-size:13px}
+ .lv-side .lv-sidebox{padding:12px;border-radius:14px}
+ .lv-side .lv-h{font-size:15px;margin:0 0 4px}
+ .lv-side .lv-empty{font-size:12px;padding:4px 0}
+ .lv-side .lv-line{padding:6px 0;gap:8px}
+ .lv-side .lv-line small{font-size:10px}
+ .lv-side .lv-in{padding:8px 10px;font-size:13px;margin-bottom:6px;border-radius:10px}
+ .lv-side .lv-send{padding:10px;font-size:14px}
+ .lv-side .lv-step button{width:26px;height:26px;border-radius:50%;font-size:13px;box-shadow:none}
  .lv-imgbox{--s:118px}
 }`;
             document.head.appendChild(css);
@@ -7614,7 +7743,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 if (!it.length) { err.textContent = 'Agrega al menos un platillo.'; return; }
                 if (name.length < 2) { err.textContent = 'Escribe tu nombre.'; return; }
                 if (ph.length < 10) { err.textContent = 'Escribe tu WhatsApp a 10 dígitos.'; return; }
-                if (!navigator.onLine) { err.textContent = 'Sin internet: no se pudo enviar. Revisa tu conexión.'; return; }
+                if (!navigator.onLine || (window.__net && !window.__net.online)) { err.textContent = 'Sin internet: no se pudo enviar. Revisa tu conexión.'; return; }
                 if (Date.now() - Number(localStorage.getItem('pargo_llevar_t') || 0) < 60000) { err.textContent = 'Espera un minuto antes de enviar otro pedido.'; return; }
                 saveForm();
                 try {
