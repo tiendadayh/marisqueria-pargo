@@ -2344,7 +2344,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const sb = document.getElementById('ticket-share-block');
             if (sb) sb.classList.toggle('hidden', cust || wait);
             const dl = document.getElementById('btn-download-ticket-pdf');
-            if (dl) dl.classList.toggle('hidden', wait || (cust && !(currentTicketData && currentTicketData.kind === 'venta')));
+            if (dl) dl.classList.toggle('hidden', wait || cust);
         }
 
         // --- WHATSAPP: normalizar y mostrar números ---
@@ -2476,9 +2476,11 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 <button onclick="customerGetTicket('${sale.id}')" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2"><i class="fa-solid fa-file-arrow-down"></i> DESCARGAR MI TICKET PDF</button>
             </div>`;
         }
-        function customerGetTicket(folio) {
+        async function customerGetTicket(folio) {
             openTicketModalForSale(folio);
-            setTimeout(() => { try { downloadTicketPDF(); } catch (e) {} }, 450);
+            await new Promise(r => setTimeout(r, 450));
+            try { await downloadTicketPDF(); } catch (e) {}
+            closeModal('modal-ticket-receipt');
         }
         function askCustomerTicket(sale) {
             try {
@@ -6996,7 +6998,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
             { const _g = customerSessionGate(table);
               if (_g === 'needpin') { const _hasPin = document.getElementById('customer-join-pin'); if (!_hasPin) container.innerHTML = customerPinGateHtml(table); footer.innerHTML = ''; return; }
-              if (_g === 'ended' || _g === 'ended-free') { const _fw = document.getElementById('customer-farewell'); const _ls = customerLastSale(table); if (!_fw || _fw.getAttribute('data-join') !== (table.status !== 'free' ? '1' : '0') || _fw.getAttribute('data-tk') !== (_ls ? _ls.id : '')) container.innerHTML = customerFarewellHtml(table); if (_ls) askCustomerTicket(_ls); footer.innerHTML = ''; return; } }
+              if (_g === 'ended' || _g === 'ended-free') { const _fw = document.getElementById('customer-farewell'); const _ls = customerLastSale(table); if (!_fw || _fw.getAttribute('data-join') !== (table.status !== 'free' ? '1' : '0') || _fw.getAttribute('data-tk') !== (_ls ? _ls.id : '')) container.innerHTML = customerFarewellHtml(table); footer.innerHTML = ''; return; } }
 
             const total = table.items.reduce((s, i) => s + (i.price * i.qty), 0);
 
@@ -7619,7 +7621,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 var d = document.createElement('div');
                 d.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 12px);max-width:460px;margin:0 auto;z-index:100001;padding:16px 18px;border-radius:18px;background:' + (color || '#0284c7') + ';color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.5);cursor:pointer';
                 d.innerHTML = '<div style="font-size:20px;font-weight:900">' + title + '</div><div style="font-size:14px;margin-top:4px;opacity:.95">' + msg + '</div>';
-                d.onclick = function () { d.remove(); }; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 8000);
+                d.onclick = function () { d.remove(); }; (document.documentElement.classList.contains('llevar') && document.getElementById('llevar-root') || document.body).appendChild(d); setTimeout(function () { d.remove(); }, 8000);
             } catch (e) {}
         };
         var MENU = null, MENUCFG = {};
@@ -8020,7 +8022,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                     d.id = 'llv-ask-tk';
                     d.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,8,20,.78);display:flex;align-items:center;justify-content:center;padding:16px';
                     d.innerHTML = '<div style="width:100%;max-width:360px;background:#0f172a;border:1px solid #334155;border-radius:22px;padding:22px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.6)"><div style="font-size:40px">🧾</div><h3 style="margin:6px 0 4px;font-size:20px;font-weight:900">¡Pago recibido!</h3><p style="margin:0 0 16px;font-size:14px;color:#94a3b8">¿Quieres descargar tu ticket en PDF?</p><button id="llv-tk-yes" style="display:block;width:100%;padding:13px;border-radius:14px;background:#10b981;color:#052e1f;font-weight:900;font-size:15px;margin-bottom:8px;border:0">Sí, descargar PDF</button><button id="llv-tk-no" style="display:block;width:100%;padding:12px;border-radius:14px;background:#1e293b;color:#cbd5e1;font-weight:800;font-size:14px;border:0">No, gracias</button></div>';
-                    document.body.appendChild(d);
+                    (document.documentElement.classList.contains('llevar') && document.getElementById('llevar-root') || document.body).appendChild(d);
                     document.getElementById('llv-tk-yes').onclick = function () { d.remove(); window.llvTicketPdf(); };
                     document.getElementById('llv-tk-no').onclick = function () { d.remove(); };
                 } catch (e) {}
@@ -8041,15 +8043,16 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                         return '<tr><td style="padding:5px 0;vertical-align:top;border-bottom:1px dashed #e2e8f0"><b>' + q + '×</b> ' + esc(i.name) + (i.note ? '<div style="font-size:10px;color:#b45309;font-style:italic">' + esc(i.note) + '</div>' : '') + '</td><td style="padding:5px 0 5px 8px;text-align:right;white-space:nowrap;vertical-align:top;border-bottom:1px dashed #e2e8f0">' + $m(pr * q) + '</td></tr>';
                     }).join('');
                     box = document.createElement('div');
-                    box.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;width:320px;background:#ffffff;color:#0f172a;font-family:Segoe UI,Roboto,Arial,sans-serif;font-size:12px;padding:18px;box-sizing:border-box';
+                    box.style.cssText = 'width:320px;background:#ffffff;color:#0f172a;font-family:Segoe UI,Roboto,Arial,sans-serif;font-size:12px;padding:18px;box-sizing:border-box';
                     box.innerHTML = '<div style="text-align:center;padding-bottom:10px;border-bottom:2px solid #0f172a">' + (lg ? '<img src="' + lg + '" style="height:56px;display:block;margin:0 auto 6px;border-radius:12px">' : '') + '<div style="font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:.5px">' + esc(biz) + '</div><div style="font-size:10px;letter-spacing:3px;color:#64748b;text-transform:uppercase;margin-top:3px">Ticket · Pedido para llevar</div></div>' +
                         '<div style="padding:10px 0;font-size:11px;line-height:1.7;border-bottom:1px dashed #94a3b8"><div><b>Código:</b> ' + esc(o.code) + '</div><div><b>Cliente:</b> ' + esc(o.name) + '</div><div><b>Fecha:</b> ' + when.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + when.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) + '</div>' + (o.method ? '<div><b>Pago:</b> ' + esc(o.method) + '</div>' : '') + '</div>' +
                         '<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px"><tbody>' + rows + '</tbody></table>' +
                         '<div style="margin-top:10px;padding:10px 12px;background:#0f172a;color:#fff;border-radius:10px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Total pagado</span><span style="font-size:18px;font-weight:900;color:#fcd34d">' + $m(totalOf(o)) + ' MXN</span></div>' +
                         '<div style="text-align:center;margin-top:12px;font-size:11px;color:#475569"><b>¡Gracias por tu compra!</b><br>Te esperamos pronto 🦐</div>';
-                    document.body.appendChild(box);
+                    var stl = document.createElement('style'); stl.id = 'llv-pdf-style'; stl.textContent = 'html.llevar body > .html2pdf__overlay{display:block!important}'; document.head.appendChild(stl);
                     var im = box.querySelector('img'); if (im) { try { await im.decode(); } catch (e) {} }
                     var canvas = await html2pdf().set({ html2canvas: { scale: 2.5, useCORS: true, logging: false, backgroundColor: '#ffffff' } }).from(box).toCanvas().get('canvas');
+                    if (!canvas || !canvas.width || !canvas.height) throw new Error('canvas vacio');
                     var pageW = 80, margin = 4;
                     var pageH = Math.ceil(canvas.height / canvas.width * (pageW - margin * 2) + margin * 2) + 2;
                     var fileName = 'Ticket_' + String(biz).replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + o.code + '.pdf';
@@ -8061,7 +8064,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 } catch (e) {
                     window.llvPop('No se pudo generar el PDF', 'Intenta de nuevo con el botón "Descargar ticket PDF".', '#7f1d1d');
                 } finally {
-                    if (box && box.parentNode) box.remove();
+                    var _st = document.getElementById('llv-pdf-style'); if (_st) _st.remove();
                     llvTkBusy = false;
                 }
             };
@@ -8252,6 +8255,49 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         window.llvToggle = function () { storeConfig.takeoutOpen = storeConfig.takeoutOpen === false; saveData(); render(); };
         window.llvClose = function () { open = false; panel.style.display = 'none'; try { localStorage.setItem('llv_open', '0'); } catch (e) {} };
         function link() { var b = location.origin + location.pathname; if (b.slice(-1) === '/') b += 'index.html'; return b + '?vista=llevar'; }
+        // Descargar el QR de pedidos para llevar como imagen PNG lista para mandar por WhatsApp
+        window.llvQrDownload = async function () {
+            try {
+                if (typeof QRCode === 'undefined') { showToast('No se pudo generar el QR. Revisa tu conexión', 'error'); return; }
+                var tmp = document.createElement('div');
+                tmp.style.cssText = 'position:fixed;left:-9999px;top:0';
+                document.body.appendChild(tmp);
+                new QRCode(tmp, { text: link(), width: 840, height: 840, correctLevel: QRCode.CorrectLevel.H });
+                var qc = tmp.querySelector('canvas');
+                var W = 1080, H = 1400, c = document.createElement('canvas'); c.width = W; c.height = H;
+                var g = c.getContext('2d');
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+                g.fillStyle = '#0f172a'; g.fillRect(0, 0, W, 14);
+                var y = 70;
+                var bl = document.getElementById('brand-logo');
+                if (bl && bl.src) {
+                    try {
+                        var im = new Image(); im.src = bl.src; await im.decode();
+                        var lh = 150, lw = im.width / im.height * lh;
+                        g.drawImage(im, (W - lw) / 2, y, lw, lh); y += lh + 30;
+                    } catch (e) {}
+                }
+                g.textAlign = 'center'; g.fillStyle = '#0f172a';
+                g.font = '900 64px "Segoe UI", Roboto, Arial, sans-serif';
+                g.fillText(String((storeConfig && storeConfig.businessName) || 'Marisquería PARGO').toUpperCase(), W / 2, y + 60);
+                g.fillStyle = '#ea580c'; g.font = '800 44px "Segoe UI", Roboto, Arial, sans-serif';
+                g.fillText('Pedidos para llevar', W / 2, y + 125);
+                var qy = y + 170;
+                g.fillStyle = '#f1f5f9'; g.fillRect((W - 900) / 2, qy, 900, 900);
+                if (qc) g.drawImage(qc, (W - 840) / 2, qy + 30, 840, 840);
+                g.fillStyle = '#0f172a'; g.font = '800 42px "Segoe UI", Roboto, Arial, sans-serif';
+                g.fillText('Escanea el código y haz tu pedido', W / 2, qy + 900 + 70);
+                g.fillStyle = '#64748b'; g.font = '600 32px "Segoe UI", Roboto, Arial, sans-serif';
+                g.fillText('Pagas al recoger · Pedidos y reservaciones: 744 294 0816', W / 2, qy + 900 + 120);
+                tmp.remove();
+                var blob = await new Promise(function (res) { c.toBlob(res, 'image/png'); });
+                var url = URL.createObjectURL(blob), a = document.createElement('a');
+                a.href = url; a.download = 'QR_Pedidos_Para_Llevar.png';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
+                showToast('QR descargado como imagen', 'success');
+            } catch (e) { showToast('No se pudo descargar el QR', 'error'); }
+        };
         window.llvCopy = function () { try { navigator.clipboard.writeText(link()); showToast('Enlace copiado', 'success'); } catch (e) { prompt('Copia el enlace:', link()); } };
 
         /* ---------- Avisos grandes en pantalla ---------- */
@@ -8357,7 +8403,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             var chip = function (n, l, c) { return '<div style="flex:1;min-width:84px;text-align:center;padding:8px;border-radius:12px;background:#0f172a;border:1px solid ' + c + '"><div style="font-size:22px;font-weight:900;color:' + c + '">' + n + '</div><div style="font-size:11px;color:#94a3b8;font-weight:700">' + l + '</div></div>'; };
             var h = '<div style="max-width:1000px;margin:0 auto"><div style="position:sticky;top:0;z-index:5;background:#020814;display:flex;justify-content:space-between;align-items:center;padding:10px 0;margin-bottom:10px;border-bottom:1px solid #1e293b"><h2 style="font-size:20px;font-weight:800">🥡 Pedidos para llevar</h2><button onclick="llvClose()" style="' + bt + 'background:#334155">Cerrar</button></div>';
             h += '<div style="display:flex;gap:8px;margin-bottom:12px">' + chip(nuevos.length, 'Nuevos', '#38bdf8') + chip(coc.length, 'En cocina', '#fbbf24') + chip(ent.length, 'Por entregar', '#f472b6') + chip(hist.filter(function (o) { return o.status === 'entregado'; }).length, 'Entregados', '#34d399') + '</div>';
-            h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><button onclick="llvSound()" style="' + bt + 'background:#475569">🔔 Probar sonido / activar avisos</button>' + (adm ? '<button onclick="llvToggle()" style="' + bt + 'background:' + (storeConfig.takeoutOpen === false ? '#be123c' : '#059669') + '">' + (storeConfig.takeoutOpen === false ? 'Pausado · tocar para abrir' : 'Abierto · tocar para pausar') + '</button><button onclick="llvCopy()" style="' + bt + 'background:#0ea5e9">Copiar enlace</button><div id="llv-qr" style="background:#fff;padding:6px;border-radius:8px"></div>' : '') + '</div>';
+            h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><button onclick="llvSound()" style="' + bt + 'background:#475569">🔔 Probar sonido / activar avisos</button>' + (adm ? '<button onclick="llvToggle()" style="' + bt + 'background:' + (storeConfig.takeoutOpen === false ? '#be123c' : '#059669') + '">' + (storeConfig.takeoutOpen === false ? 'Pausado · tocar para abrir' : 'Abierto · tocar para pausar') + '</button><button onclick="llvCopy()" style="' + bt + 'background:#0ea5e9">Copiar enlace</button><button onclick="llvQrDownload()" style="' + bt + 'background:#7c3aed">⬇️ Descargar QR (imagen)</button><div id="llv-qr" style="background:#fff;padding:6px;border-radius:8px"></div>' : '') + '</div>';
             if (!nuevos.length && !coc.length && !ent.length) h += '<p style="color:#94a3b8;padding:20px 0">No hay pedidos pendientes.</p>';
             h += section('🆕 Nuevos · por aceptar', '#38bdf8', nuevos, adm, bt) + section('🔥 En cocina', '#fbbf24', coc, adm, bt) + section('🍽️ Listos · por entregar', '#f472b6', ent, adm, bt);
             if (r !== 'cocina' && hist.length) h += '<div style="margin-bottom:18px"><h3 style="font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#34d399;margin:0 0 8px">✅ Historial de hoy (' + hist.length + ')</h3><div style="background:#0f172a;border-radius:12px;overflow:hidden">' + hist.map(function (o) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid #1e293b;font-size:13px"><span><b>#' + esc(o.code) + '</b> · ' + esc(o.name) + '</span><span style="color:' + (o.status === 'cancelado' ? '#f87171' : '#34d399') + '">' + (o.status === 'cancelado' ? 'Cancelado' : (adm ? $m(totalOf(o)) + ' · ' : '') + esc(o.method || '') + ' ' + hora(o.paidAt || o.updatedAt)) + '</span></div>'; }).join('') + '</div></div>';
