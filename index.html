@@ -51,6 +51,7 @@
     <!-- Librerías QR y PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <!-- Firebase SDK (sincronización en la nube Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -3987,16 +3988,20 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
         // Genera el PDF a la altura exacta del ticket (una sola hoja, fondo blanco, logo ya cargado)
         async function makeTicketPdfBlob() {
-            if (typeof html2pdf === 'undefined') throw new Error('Sin generador de PDF');
             const d = currentTicketData;
             if (!d) throw new Error('Sin datos de ticket');
             const safeName = (storeConfig.businessName || 'Ticket').replace(/[^a-zA-Z0-9_-]/g, '_');
             const fileName = `Ticket_${safeName}_${Date.now()}.pdf`;
 
             // Se obtiene la clase jsPDF que ya viene dentro de html2pdf (sin capturar pantalla)
-            const tiny = document.createElement('canvas'); tiny.width = 4; tiny.height = 4;
-            const seed = await html2pdf().from(tiny, 'canvas').toPdf().get('pdf');
-            const JsPDF = seed.constructor;
+            let JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+            if (!JsPDF && typeof html2pdf !== 'undefined') {
+                const tiny = document.createElement('canvas'); tiny.width = 100; tiny.height = 100;
+                const tc = tiny.getContext('2d'); tc.fillStyle = '#fff'; tc.fillRect(0, 0, 100, 100);
+                const seed = await html2pdf().set({ jsPDF: { unit: 'mm', format: [80, 100] } }).from(tiny, 'canvas').toPdf().get('pdf');
+                JsPDF = seed.constructor;
+            }
+            if (!JsPDF) throw new Error('No cargó la librería de PDF (revisa el internet)');
 
             // Logo en PNG (si existe)
             let logoData = null, logoRatio = 1;
@@ -4012,7 +4017,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 }
             } catch (e) { logoData = null; }
 
-            const W = 80, M = 4, CW = W - M * 2, PT = 0.3528;
+            const W = 80, M = 5, CWN = W - M * 2, PT = 0.3528;
             const isSale = d.kind === 'venta';
             const items = d.items || [];
             const count = items.reduce((s, i) => s + (i.qty || 0), 0);
@@ -4020,74 +4025,119 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const waiterStaff = (typeof staff !== 'undefined') ? staff.find(s => s.name === d.waiter) : null;
             const waiterLabel = (waiterStaff && waiterStaff.role) ? waiterStaff.role : 'Atendió';
             const wifi = (storeConfig.hasWifi && (storeConfig.wifiSsid || storeConfig.wifiPass)) ? `Wi-Fi: ${storeConfig.wifiSsid || 'Disponible'}${storeConfig.wifiPass ? ' · Clave: ' + storeConfig.wifiPass : ''}` : '';
+            const NAVY = [15, 23, 42], AMB = [251, 191, 36], GRAY = [100, 116, 139], LINE = [226, 232, 240], SL = [71, 85, 105], WHITE = [255, 255, 255];
 
             function draw(doc) {
-                let y = M;
-                const font = (size, bold) => { doc.setFont('courier', bold ? 'bold' : 'normal'); doc.setFontSize(size); return size * PT * 1.2; };
-                const center = (t, size, bold) => {
-                    const lh = font(size, bold);
-                    doc.splitTextToSize(String(t), CW).forEach(l => { y += lh; doc.text(l, W / 2, y - lh * 0.2, { align: 'center' }); });
-                };
-                const lr = (l, r, size, bold) => {
-                    const lh = font(size, bold);
-                    const rw = doc.getTextWidth(String(r));
-                    const lines = doc.splitTextToSize(String(l), Math.max(10, CW - rw - 2));
-                    lines.forEach((ln, i) => {
-                        y += lh;
-                        doc.text(ln, M, y - lh * 0.2);
-                        if (i === 0) doc.text(String(r), W - M, y - lh * 0.2, { align: 'right' });
-                    });
-                };
-                const left = (t, size, bold) => {
-                    const lh = font(size, bold);
-                    doc.splitTextToSize(String(t), CW).forEach(l => { y += lh; doc.text(l, M, y - lh * 0.2); });
-                };
-                const dash = () => { y += 1.5; doc.setLineWidth(0.2); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(M, y, W - M, y); doc.setLineDashPattern([], 0); y += 1.5; };
-                const solid = () => { y += 1; doc.setLineWidth(0.3); doc.line(M, y, W - M, y); y += 1; };
+                let y = 0;
+                const fill = c => doc.setFillColor(c[0], c[1], c[2]);
+                const ink = c => doc.setTextColor(c[0], c[1], c[2]);
+                const stroke = c => doc.setDrawColor(c[0], c[1], c[2]);
+                const f = (size, bold) => { doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size); return size * PT; };
+                const dashLine = (x1, x2, yy, c, on, off, w) => { stroke(c); doc.setLineWidth(w || 0.2); doc.setLineDashPattern([on, off], 0); doc.line(x1, yy, x2, yy); doc.setLineDashPattern([], 0); };
 
-                doc.setTextColor(0, 0, 0); doc.setDrawColor(0, 0, 0);
+                // Barra superior naranja-ámbar
+                fill([249, 115, 22]); doc.rect(0, 0, W, 1.6, 'F');
+                fill(AMB); doc.rect(W * 0.3, 0, W * 0.4, 1.6, 'F');
+                y = 1.6;
+
+                // Encabezado oscuro con logo y nombre
+                const logoH = 14, logoW = logoData ? logoH * logoRatio : 0;
+                f(13, true);
+                const nameLines = doc.splitTextToSize(String(d.businessName).toUpperCase(), W - 12);
+                const nameLH = 13 * PT * 1.15;
+                const headH = 5 + (logoData ? logoH + 3 + 3 : 0) + nameLines.length * nameLH + 5 + 4;
+                fill(NAVY); doc.rect(0, y, W, headH, 'F');
+                let hy = y + 5;
                 if (logoData) {
-                    const h = 14, w = h * logoRatio;
-                    try { doc.addImage(logoData, 'PNG', (W - w) / 2, y, w, h); y += h + 2; } catch (e) {}
+                    fill(WHITE); doc.roundedRect((W - logoW) / 2 - 1.5, hy, logoW + 3, logoH + 3, 2.5, 2.5, 'F');
+                    try { doc.addImage(logoData, 'PNG', (W - logoW) / 2, hy + 1.5, logoW, logoH); } catch (e) {}
+                    hy += logoH + 3 + 3;
                 }
-                center(String(d.businessName).toUpperCase(), 12, true);
-                center(isSale ? 'TICKET DE VENTA' : 'CUENTA - TICKET DE CONSUMO', 7.5, false);
-                dash();
-                lr('Folio', isSale ? d.folio : 'Cuenta abierta', 8.5, false);
-                lr('Fecha', d.dateStr || '-', 8.5, false);
-                lr('Hora', d.timeStr || '-', 8.5, false);
-                lr('Mesa', d.tableName || '-', 8.5, false);
-                lr('Personas', d.guests ? d.guests : '-', 8.5, false);
-                lr(waiterLabel, d.waiter || '-', 8.5, false);
-                dash();
-                lr('CANT x P.UNIT', 'IMPORTE', 7.5, true);
-                solid();
-                if (items.length) {
-                    items.forEach(i => {
-                        left(i.name, 8.5, true);
-                        lr(`${i.qty} x ${money(i.price)}`, money(i.price * i.qty), 8.5, false);
-                        if (i.notes) left('Nota: ' + i.notes, 7.5, false);
-                        y += 1.2;
-                    });
-                } else if (isSale) {
-                    lr(`Consumo cerrado (${d.method || 'Efectivo'})`, money(d.total), 8.5, true);
+                f(13, true); ink(WHITE);
+                nameLines.forEach(l => { hy += nameLH; doc.text(l, W / 2, hy - nameLH * 0.2, { align: 'center' }); });
+                f(6.5, true); ink(AMB);
+                hy += 4.2;
+                doc.text(isSale ? 'TICKET DE VENTA' : 'CUENTA · TICKET DE CONSUMO', W / 2, hy, { align: 'center', charSpace: 0.35 });
+                y += headH + 3;
+
+                // Datos del ticket
+                const info = [['FOLIO', isSale ? d.folio : 'Cuenta abierta'], ['FECHA', d.dateStr || '-'], ['HORA', d.timeStr || '-'], ['MESA', d.tableName || '-'], ['PERSONAS', d.guests ? d.guests : '-'], [String(waiterLabel).toUpperCase(), d.waiter || '-']];
+                info.forEach(([k, v]) => {
+                    f(8, true);
+                    const vl = doc.splitTextToSize(String(v), 44);
+                    const rh = vl.length * 3.6 + 2;
+                    f(6.2, false); ink(GRAY); doc.text(String(k), M, y + 3.5);
+                    f(8, true); ink(NAVY);
+                    vl.forEach((ln, i) => doc.text(ln, W - M, y + 3.5 + i * 3.6, { align: 'right' }));
+                    y += rh;
+                    dashLine(M, W - M, y, LINE, 0.3, 0.5, 0.2);
+                    y += 0.8;
+                });
+                y += 1.5;
+                dashLine(M, W - M, y, [147, 197, 253], 1, 0.8, 0.25);
+                y += 3;
+
+                // Tabla de productos
+                const pRight = W - M - 20, iRight = W - M - 1.5, nameX = M + 13, nameW = pRight - 14 - nameX;
+                fill(NAVY); doc.rect(M, y, CWN, 5.6, 'F');
+                f(5.8, true); ink(AMB);
+                doc.text('CANT.', M + 1.5, y + 3.7);
+                doc.text('PRODUCTO', M + 9, y + 3.7);
+                doc.text('P. UNIT.', pRight, y + 3.7, { align: 'right' });
+                doc.text('IMPORTE', iRight, y + 3.7, { align: 'right' });
+                y += 5.6;
+                if (!items.length) {
+                    f(7.5, false); ink(GRAY);
+                    if (isSale) { doc.text(`Consumo cerrado (${d.method || 'Efectivo'})`, M + 1.5, y + 5); f(8, true); ink(NAVY); doc.text(money(d.total), iRight, y + 5, { align: 'right' }); }
+                    else doc.text('Sin productos en la cuenta', W / 2, y + 5, { align: 'center' });
+                    y += 8;
                 } else {
-                    center('Sin productos en la cuenta', 8.5, false);
+                    items.forEach((it, idx) => {
+                        f(7.5, true);
+                        const nl = doc.splitTextToSize(String(it.name), nameW);
+                        f(6.2, false);
+                        const nt = it.notes ? doc.splitTextToSize('Nota: ' + it.notes, nameW) : [];
+                        const rh = Math.max(nl.length * 3.4, 4) + nt.length * 2.8 + 3.2;
+                        if (idx % 2) { fill([248, 250, 252]); doc.rect(M, y, CWN, rh, 'F'); }
+                        f(8, true); ink(NAVY); doc.text(String(it.qty), M + 1.5, y + 4.1);
+                        const dn = (typeof dishNumByItem === 'function') ? dishNumByItem(it) : '';
+                        if (dn) {
+                            fill(NAVY); doc.roundedRect(M + 6.2, y + 1.4, 4.6, 3.8, 1, 1, 'F');
+                            f(6, true); ink(AMB); doc.text(String(dn), M + 8.5, y + 4.1, { align: 'center' });
+                        }
+                        f(7.5, true); ink([30, 41, 59]);
+                        nl.forEach((ln, i) => doc.text(ln, nameX, y + 4.1 + i * 3.4));
+                        if (nt.length) { f(6.2, false); ink([194, 65, 12]); nt.forEach((ln, i) => doc.text(ln, nameX, y + 4.1 + nl.length * 3.4 - 0.4 + i * 2.8)); }
+                        f(7, false); ink(SL); doc.text(money(it.price), pRight, y + 4.1, { align: 'right' });
+                        f(8, true); ink(NAVY); doc.text(money(it.price * it.qty), iRight, y + 4.1, { align: 'right' });
+                        y += rh;
+                        stroke(LINE); doc.setLineWidth(0.2); doc.line(M, y, W - M, y);
+                    });
                 }
-                dash();
-                lr('Articulos', count, 8.5, false);
-                lr('Subtotal', money(d.total), 8.5, false);
-                solid();
-                lr(isSale ? 'TOTAL PAGADO' : 'TOTAL', money(d.total), 12, true);
-                solid();
-                if (isSale) center('Forma de pago: ' + (d.method || 'Efectivo'), 8, false);
-                dash();
-                center('¡Gracias por su visita!', 9, true);
-                center('Esperamos verle pronto', 7.5, false);
-                if (wifi) { y += 1; center(wifi, 7.5, false); }
-                y += 1;
-                center(isSale ? 'Gracias por tu visita y tu preferencia. "Del mar a tu paladar". Pedidos y reservaciones: 744 294 0816.' : 'Cuenta preliminar: no es comprobante de pago.', 6.5, false);
-                return y + M;
+                y += 3.5;
+
+                // Totales
+                f(7.5, false); ink(SL); doc.text('Artículos', M, y + 3); f(7.5, true); doc.text(String(count), W - M, y + 3, { align: 'right' });
+                y += 4.6;
+                f(7.5, false); doc.text('Subtotal', M, y + 3); f(7.5, true); doc.text(money(d.total), W - M, y + 3, { align: 'right' });
+                y += 5.2;
+                fill(NAVY); doc.roundedRect(M, y, CWN, 11.5, 2.8, 2.8, 'F');
+                f(6.5, true); ink(WHITE); doc.text(isSale ? 'TOTAL PAGADO' : 'TOTAL A PAGAR', M + 4, y + 6.9, { charSpace: 0.3 });
+                f(13, true); ink(AMB); doc.text(money(d.total) + ' MXN', W - M - 4, y + 7.6, { align: 'right' });
+                y += 11.5 + 3;
+                if (isSale) { f(7, false); ink(GRAY); doc.text('Forma de pago: ' + (d.method || 'Efectivo'), W / 2, y + 1, { align: 'center' }); y += 4; }
+                y += 2;
+                dashLine(M, W - M, y, [147, 197, 253], 1, 0.8, 0.25);
+                y += 4.5;
+
+                // Pie
+                f(9, true); ink([30, 41, 59]); doc.text('¡Gracias por su visita!', W / 2, y, { align: 'center' }); y += 3.8;
+                f(7, false); ink(GRAY); doc.text('Esperamos verle pronto', W / 2, y, { align: 'center' }); y += 3.4;
+                if (wifi) { doc.text(wifi, W / 2, y, { align: 'center' }); y += 3.4; }
+                f(6.2, false); ink([148, 163, 184]);
+                const disc = isSale ? 'Gracias por tu visita y tu preferencia. "Del mar a tu paladar". Pedidos y reservaciones: 744 294 0816.' : 'Cuenta preliminar: no es comprobante de pago.';
+                doc.splitTextToSize(disc, CWN).forEach(l => { y += 2.9; doc.text(l, W / 2, y, { align: 'center' }); });
+                return y + 6;
             }
 
             // 1ª pasada: medir alto; 2ª pasada: hoja exacta de 80 mm de ancho
@@ -4095,6 +4145,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const H = Math.max(60, Math.ceil(draw(measure)));
             const doc = new JsPDF({ unit: 'mm', format: [W, H] });
             draw(doc);
+            doc.setProperties({ title: 'Ticket ' + d.businessName });
             return { blob: doc.output('blob'), fileName };
         }
 
@@ -4174,7 +4225,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     showToast('PDF descargado. Escribe el WhatsApp del cliente para abrir su chat', 'info');
                 }
             } catch (e) {
-                showToast('No se pudo preparar el PDF del ticket', 'error');
+                console.error('ticket pdf', e);
+                showToast('No se pudo preparar el PDF: ' + ((e && e.message) || e), 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = original;
@@ -4196,7 +4248,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 setTimeout(() => URL.revokeObjectURL(url), 10000);
                 showToast(`Archivo "${res.fileName}" descargado con éxito`, 'success');
             } catch (e) {
-                showToast('Ocurrió un error al generar el PDF', 'error');
+                console.error('ticket pdf', e);
+                showToast('Error al generar el PDF: ' + ((e && e.message) || e), 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = original;
@@ -8325,7 +8378,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             if (!webArrivedGet(id)) { showToast('No se puede cobrar: marca primero que el cliente llegó', 'warning'); return; }
             var its = o.items.map(function (i) { return { sku: i.sku || '', name: i.name, price: priceOf(i), qty: i.qty, notes: i.note || '' }; });
             salesHistory.unshift({ id: 'LL-' + o.code, folioNum: webFolioNum(o) || 0, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date().toLocaleTimeString('es-MX'), closedAt: new Date().toISOString(), method: method, guests: 0, phone: o.phone, proof: '', partial: false, items: its, total: totalOf(o) });
-            markSalePending('LL-' + o.code); saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success'); try { askTicketPdf('LL-' + o.code); } catch (e) {}
+            markSalePending('LL-' + o.code); saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success');
         };
         // Reiniciar ventas: borra también el "Historial de hoy" de pedidos para llevar (entregados y cancelados). Los pendientes NO se tocan.
         window.llvClearHistory = async function () {
@@ -8582,7 +8635,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         function paint() {
             if (!pill) return;
             var on = !!lock;
-            pill.textContent = on ? '🔆 Pantalla activa' : '🌙 Pantalla puede apagarse';
+            var small = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+            pill.textContent = small ? (on ? '🔆' : '🌙') : (on ? '🔆 Pantalla activa' : '🌙 Pantalla puede apagarse');
             pill.style.background = on ? 'rgba(16,185,129,.18)' : 'rgba(100,116,139,.25)';
             pill.style.color = on ? '#6ee7b7' : '#cbd5e1';
             pill.style.borderColor = on ? 'rgba(16,185,129,.5)' : 'rgba(148,163,184,.4)';
@@ -8599,14 +8653,20 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             pill = document.createElement('button');
             pill.type = 'button';
             pill.title = 'Mantiene la pantalla encendida para que lleguen los avisos de pedidos. Toca para activar o desactivar.';
-            pill.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9990;padding:5px 10px;border-radius:999px;border:1px solid;font-size:10px;font-weight:800;backdrop-filter:blur(6px);opacity:.85;min-height:0';
+            pill.setAttribute('aria-label', 'Mantener pantalla encendida');
+            var hdr = document.querySelector('header');
+            // Dentro del encabezado (arriba): no tapa botones ni la barra de abajo del teléfono
+            pill.style.cssText = hdr
+                ? 'flex:none;padding:4px 8px;border-radius:999px;border:1px solid;font-size:10px;font-weight:800;line-height:1.2;min-height:0;min-width:0;width:auto;margin-left:auto'
+                : 'position:fixed;right:8px;top:8px;z-index:9990;padding:4px 8px;border-radius:999px;border:1px solid;font-size:10px;font-weight:800;opacity:.85;min-height:0';
             pill.onclick = function () {
                 want = !want;
                 try { localStorage.setItem('pargo_wl_off', want ? '0' : '1'); } catch (e) {}
                 if (want) acquire(); else release();
                 if (typeof showToast === 'function') showToast(want ? 'La pantalla se mantendrá encendida' : 'La pantalla podrá apagarse', 'info');
             };
-            document.body.appendChild(pill); paint(); acquire();
+            (hdr || document.body).appendChild(pill); paint(); acquire();
+            if (window.matchMedia) { try { window.matchMedia('(max-width: 767px)').addEventListener('change', paint); } catch (e) {} }
         }
         document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') acquire(); });
         ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, acquire, { passive: true }); });
