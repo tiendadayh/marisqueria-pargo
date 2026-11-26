@@ -1005,6 +1005,7 @@
                         <div class="p-4 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-950/50">
                             <div id="corte-filter-chips" class="flex flex-wrap items-center gap-2"></div>
                             <button onclick="clearSalesData()" class="caja-tool bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30"><i class="fa-solid fa-rotate-left"></i> Reiniciar ventas</button>
+                            <button onclick="resetFolios()" class="caja-tool bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"><i class="fa-solid fa-hashtag"></i> Reiniciar folios (#001)</button>
                         </div>
                         <div class="overflow-auto" style="max-height:30rem">
                             <table class="caja-tbl w-full text-left text-xs">
@@ -2455,7 +2456,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         }
         function customerFarewellHtml(table) {
             const canJoin = table.status !== 'free';
-            return `
+            return `<div id="customer-farewell" data-join="${canJoin ? 1 : 0}">
                 <div class="py-10 px-4 text-center space-y-3">
                     <div class="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-3xl">🙏</div>
                     <h3 class="text-lg font-black text-white">¡Gracias por tu visita!</h3>
@@ -2463,13 +2464,19 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 </div>
                 ${canJoin ? `
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-                    <p class="text-xs font-bold text-slate-300">¿Eres un cliente nuevo en esta mesa?</p>
-                    <p class="text-[10px] text-slate-500">Pide el código de 4 dígitos a tu mesera.</p>
+                    <p class="text-xs font-bold text-slate-300">¿Quieres pedir algo más o llegó alguien nuevo a la mesa?</p>
+                    <p class="text-[10px] text-slate-500">Escribe el código de 4 dígitos que te da tu mesera.</p>
                     <div class="flex gap-2">
                         <input id="customer-join-pin2" type="tel" inputmode="numeric" maxlength="4" placeholder="0000" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white text-center text-sm font-black tracking-[0.4em] focus:outline-none focus:border-emerald-500">
                         <button onclick="joinCustomerTable()" class="px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl">Entrar</button>
                     </div>
-                </div>` : ''}`;
+                </div>` : `
+                <div class="bg-slate-900 border border-dashed border-slate-700 rounded-2xl p-4 space-y-2 text-center">
+                    <p class="text-xs font-bold text-slate-300">¿Quieres pedir algo más?</p>
+                    <p class="text-[11px] text-slate-400 leading-snug">Avisa a tu mesera: ella vuelve a abrir tu mesa y te da un <b class="text-sky-300">código de 4 dígitos</b>. En cuanto lo haga, aquí mismo aparecerá el espacio para escribirlo.</p>
+                </div>`}
+                <a href="?vista=llevar" class="block text-center text-[11px] font-bold text-sky-300 py-3">🥡 ¿Prefieres pedir para llevar? Toca aquí</a>
+                </div>`;
         }
         function joinCustomerTable() {
             const t = getCustomerTable();
@@ -3894,6 +3901,19 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             scheduleTicketPdfPrefetch();
         }
 
+        // Al cerrar una venta (mesa o pedido para llevar): preguntar si quiere su ticket en PDF
+        function askTicketPdf(folio) {
+            try {
+                const old = document.getElementById('ask-ticket-pdf'); if (old) old.remove();
+                const d = document.createElement('div');
+                d.id = 'ask-ticket-pdf';
+                d.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(2,8,20,.75);display:flex;align-items:center;justify-content:center;padding:16px';
+                d.innerHTML = '<div style="width:100%;max-width:360px;background:#0f172a;border:1px solid #334155;border-radius:22px;padding:22px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.6)"><div style="font-size:40px">🧾</div><h3 style="margin:6px 0 4px;font-size:20px;font-weight:900">Venta cobrada</h3><p style="margin:0 0 16px;font-size:13px;color:#94a3b8">¿El cliente quiere su ticket en PDF?</p><button id="ask-ticket-yes" style="display:block;width:100%;padding:13px;border-radius:14px;background:#10b981;color:#052e1f;font-weight:900;font-size:15px;margin-bottom:8px">Sí, ver ticket / PDF</button><button id="ask-ticket-no" style="display:block;width:100%;padding:12px;border-radius:14px;background:#1e293b;color:#cbd5e1;font-weight:800;font-size:14px">No, gracias</button></div>';
+                document.body.appendChild(d);
+                document.getElementById('ask-ticket-yes').onclick = function () { d.remove(); openTicketModalForSale(folio); };
+                document.getElementById('ask-ticket-no').onclick = function () { d.remove(); };
+            } catch (e) {}
+        }
         function openTicketModalForSale(folio) {
             const sale = salesHistory.find(s => s.id === folio);
             if (!sale) return;
@@ -5277,7 +5297,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             } else {
                 showToast(`¡Venta ${folio} por $${total.toFixed(2)} cobrada por ${selectedPaymentMethod.toLowerCase()}! Mesa liberada.`, 'success');
             }
-            if (salePhone) openTicketModalForSale(folio);
+            if (salePhone) openTicketModalForSale(folio); else askTicketPdf(folio);
         }
 
         // --- DIVIDIR CUENTA (cobro parcial por platillos) ---
@@ -6588,16 +6608,25 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             showToast('Archivo descargado con éxito', 'success');
         }
 
+        // Folios (numeración de pedidos de meseras + web) aparte de las ventas
+        function resetFolios() {
+            if (!isAdminUnlocked) { denyNeedsAdmin(); return; }
+            let webPend = 0; try { webPend = webQueueRaw().length; } catch (e) {}
+            if (kitchenHasOpenTickets() || webPend) { showToast('No se pueden reiniciar los folios: hay pedidos pendientes en cocina (mesas o web). Espera a que terminen.', 'warning'); return; }
+            if (!confirm('¿Reiniciar los folios de pedidos (meseras y web) a #001? Las ventas NO se borran.')) return;
+            storeConfig.kitchenSeq = 0; storeConfig.kitchenSeqDay = localDayKey(); storeConfig.webSeq = {}; storeConfig.webArrived = {};
+            saveData();
+            refreshAllTableViews();
+            showToast('Folios reiniciados: el siguiente pedido será #001 (ventas intactas)', 'success');
+        }
         function clearSalesData() {
             if (!isAdminUnlocked) { denyNeedsAdmin(); return; }
-            if (confirm('¿Borrar TODAS las ventas y comprobantes, el historial de pedidos para llevar (web), reiniciar los totales de las meseras y los números de pedido (#001)? No se puede deshacer.')) {
+            if (confirm('¿Borrar TODAS las ventas y comprobantes, el historial de pedidos para llevar (web) y reiniciar los totales de las meseras? Los folios (#001) NO se tocan: tienen su propio botón. No se puede deshacer.')) {
                 salesHistory = [];
                 storeConfig.salesResetAt = new Date().toISOString();
                 setPendingSales([]);
                 staff.forEach(s => { s.salesCount = 0; s.salesTotal = 0; });
-                let msg = 'Ventas reiniciadas';
-                if (kitchenHasOpenTickets()) msg += '. Los números de pedido NO se reiniciaron porque hay pedidos pendientes en cocina';
-                else { storeConfig.kitchenSeq = 0; storeConfig.kitchenSeqDay = localDayKey(); storeConfig.webSeq = {}; storeConfig.webArrived = {}; msg += ' y pedidos en #001'; }
+                let msg = 'Ventas reiniciadas (los folios siguen igual)';
                 saveData();
                 try { if (window.llvClearHistory) window.llvClearHistory(); } catch (e) {}
                 renderAdminReports();
@@ -6921,7 +6950,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
             { const _g = customerSessionGate(table);
               if (_g === 'needpin') { const _hasPin = document.getElementById('customer-join-pin'); if (!_hasPin) container.innerHTML = customerPinGateHtml(table); footer.innerHTML = ''; return; }
-              if (_g === 'ended' || _g === 'ended-free') { container.innerHTML = customerFarewellHtml(table); footer.innerHTML = ''; return; } }
+              if (_g === 'ended' || _g === 'ended-free') { const _fw = document.getElementById('customer-farewell'); if (!_fw || _fw.getAttribute('data-join') !== (table.status !== 'free' ? '1' : '0')) container.innerHTML = customerFarewellHtml(table); footer.innerHTML = ''; return; } }
 
             const total = table.items.reduce((s, i) => s + (i.price * i.qty), 0);
 
@@ -7691,6 +7720,13 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-card .lv-step button{border-radius:0;border:0;box-shadow:none;background:transparent;color:#fb923c;width:44px}
 .lv-num-abs{position:absolute;top:6px;left:6px;z-index:2;margin:0}
 .lv-chip.on{background:#f97316;color:#111;border-color:#f97316}
+.lv-thanks{margin:0 0 20px;padding:22px 16px;border-radius:22px;background:linear-gradient(135deg,#047857,#059669 55%,#10b981);color:#fff;box-shadow:0 14px 34px -10px rgba(16,185,129,.55);animation:lvpop .5s cubic-bezier(.3,1.5,.5,1)}
+.lv-thanks-ic{width:64px;height:64px;margin:0 auto 10px;border-radius:50%;background:#fff;color:#059669;font-size:36px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 8px rgba(255,255,255,.2)}
+.lv-thanks-t{font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:24px;line-height:1.1}
+.lv-thanks-s{margin-top:6px;font-size:13px;opacity:.92}
+.lv-again{display:block;width:100%;max-width:340px;margin:22px auto 0;padding:15px 20px;border-radius:999px;border:0;background:linear-gradient(135deg,#ff7a2c,#ff4d1f);color:#fff;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:16px;cursor:pointer;box-shadow:0 12px 28px -8px rgba(255,90,44,.65),inset 0 1px 0 rgba(255,255,255,.35);white-space:nowrap}
+.lv-again:active{transform:scale(.97)}
+@keyframes lvpop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
 .lv-numrow{display:flex;gap:8px;align-items:center;margin:0 0 6px;padding:8px;border-radius:16px;border:1px solid rgba(245,158,11,.5);background:#06182a}
 .lv-numrow .nb{padding:6px 10px;border-radius:10px;background:#f59e0b;color:#0f172a;font-weight:900}
 .lv-numrow input{flex:1;min-width:0;padding:11px;border-radius:12px;border:1px solid #1e4a78;background:#0b2238;color:#fff;font-size:14px;font-weight:600;outline:none}
@@ -7973,15 +8009,16 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                     : st === 'preparando' ? 'Tu pedido se está preparando en cocina. Te avisamos aquí en cuanto esté listo.'
                     : st === 'cocinado' ? '¡Tu comida ya está lista en cocina! En un momento te avisamos para que pases por ella.'
                     : st === 'listo' ? '¡Tu pedido ya está listo! Puedes pasar a recogerlo. Muestra tu código <b>' + esc(o.code) + '</b>.'
-                    : (st === 'entregado' || st === 'archivado') ? 'Pedido entregado. ¡Gracias, buen provecho!'
+                    : (st === 'entregado' || st === 'archivado') ? 'Tu pedido <b>' + esc(o.code) + '</b> fue entregado. ¡Buen provecho!'
                     : 'Este pedido fue cancelado. Si tienes dudas llámanos al 744 294 0816.';
-                var banner = st === 'listo' ? '<div style="margin:0 0 18px;padding:16px;border-radius:16px;background:#059669;color:#fff;font-size:22px;font-weight:800">✅ ¡Ya puedes pasar por tu pedido!</div>' : '';
+                var done = (st === 'entregado' || st === 'archivado');
+                var banner = done ? '<div class="lv-thanks"><div class="lv-thanks-ic">✔</div><div class="lv-thanks-t">¡Gracias por tu compra!</div><div class="lv-thanks-s">Que disfrutes tu pedido 🦐 · Te esperamos pronto en Marisquería PARGO</div></div>' : st === 'listo' ? '<div style="margin:0 0 18px;padding:16px;border-radius:16px;background:#059669;color:#fff;font-size:22px;font-weight:800">✅ ¡Ya puedes pasar por tu pedido!</div>' : '';
                 var items = (o.items || []).map(function (i) { return '<li>' + i.qty + ' × ' + esc(i.name) + (i.note ? ' <i style="color:#fbbf24">(' + esc(i.note) + ')</i>' : '') + '</li>'; }).join('');
                 root.innerHTML = shell('<div class="lv-track">' + banner + '<div style="font-size:13px;color:#94a3b8">Tu código</div><div style="font-size:44px;font-weight:800;letter-spacing:4px;color:#fbbf24">' + esc(o.code) + '</div>' +
                     (st === 'cancelado' ? '' : '<div style="display:flex;align-items:flex-start;margin:20px 0">' + bar + '</div>') +
                     '<div style="color:#cbd5e1;font-size:15px;margin-bottom:14px">' + msg + '</div>' +
                     '<div style="text-align:left;background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:12px 14px;color:#94a3b8;font-size:13px"><div style="color:#e2e8f0;font-weight:700;margin-bottom:4px">' + esc(o.name) + '</div><ul style="margin:6px 0 8px 18px;list-style:disc">' + items + '</ul>Total a pagar al recoger: <b style="color:#fff">' + $m(totalOf(o)) + '</b></div>' +
-                    (fin ? '<button onclick="llvNew()" class="lv-add" style="margin-top:18px;padding:10px 18px">Hacer otro pedido</button>' : (('Notification' in window && Notification.permission === 'default' && st !== 'listo') ? '<button onclick="llvNotif()" class="lv-add" style="margin-top:16px;padding:10px 18px">🔔 Avisarme cuando esté listo</button>' : '') + '<div style="margin-top:14px;font-size:12px;color:#64748b">Esta pantalla se actualiza sola. Puedes cerrarla y volver a abrir este mismo enlace en cualquier momento.</div>') + '</div>');
+                    (fin ? '<button onclick="llvNew()" class="lv-again">🥡 Hacer otro pedido</button>' : (('Notification' in window && Notification.permission === 'default' && st !== 'listo') ? '<button onclick="llvNotif()" class="lv-add" style="margin-top:16px;padding:10px 18px">🔔 Avisarme cuando esté listo</button>' : '') + '<div style="margin-top:14px;font-size:12px;color:#64748b">Esta pantalla se actualiza sola. Puedes cerrarla y volver a abrir este mismo enlace en cualquier momento.</div>') + '</div>');
             }
             function track(id) {
                 view = 'track';
@@ -8089,7 +8126,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             if (!webArrivedGet(id)) { showToast('No se puede cobrar: marca primero que el cliente llegó', 'warning'); return; }
             var its = o.items.map(function (i) { return { sku: i.sku || '', name: i.name, price: priceOf(i), qty: i.qty, notes: i.note || '' }; });
             salesHistory.unshift({ id: 'LL-' + o.code, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date().toLocaleTimeString('es-MX'), closedAt: new Date().toISOString(), method: method, guests: 0, phone: o.phone, proof: '', partial: false, items: its, total: totalOf(o) });
-            markSalePending('LL-' + o.code); saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success');
+            markSalePending('LL-' + o.code); saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success'); try { askTicketPdf('LL-' + o.code); } catch (e) {}
         };
         // Reiniciar ventas: borra también el "Historial de hoy" de pedidos para llevar (entregados y cancelados). Los pendientes NO se tocan.
         window.llvClearHistory = async function () {
