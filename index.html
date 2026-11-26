@@ -7516,6 +7516,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-info-top{display:none;margin-left:auto;text-align:right;color:#94a3b8;font-size:12px;line-height:1.5}
 .lv-chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none}
 .lv-chip{flex:none;padding:7px 13px;border-radius:999px;background:#12304f;border:1px solid #1e4a78;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;color:#fff}
+.lv-chipn{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;padding:0 6px;margin-left:5px;border-radius:999px;background:#f59e0b;color:#0f172a;font-weight:900;font-size:11px}
 .lv-chip:hover{background:#f97316;color:#111;border-color:#f97316}
 .lv-body{padding:6px 14px 40px}
 .lv-sec{scroll-margin-top:140px;margin:0 0 26px}
@@ -7541,6 +7542,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-add[disabled]{background:#264a68;color:#a5c8e3;box-shadow:none;width:auto;padding:0 14px;font-size:13px}
 .lv-card.off .lv-imgbox img{filter:grayscale(1);opacity:.5}
 .lv-card.off .lv-name,.lv-card.off .lv-price{opacity:.55}
+.lv-num{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;margin-right:8px;border-radius:7px;background:#f59e0b;color:#0f172a;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:13px;line-height:1;vertical-align:middle;flex:none}
 .lv-card .lv-step button{width:40px;height:40px;border-radius:12px;background:#ff5a2c;color:#fff;border:2px solid #ffb38f;box-shadow:3px 3px 0 #020b14;font-size:20px}
 .lv-card .lv-step b{color:#fff;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:18px;min-width:22px}
 .lv-card .lv-note{background:#06182a;border:1.5px solid #264a68;color:#e6f3fc;margin-top:10px}
@@ -7549,7 +7551,36 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-step button{width:34px;height:34px;border-radius:11px;background:#f97316;color:#111;font-weight:800;font-size:16px}
 .lv-step.sm button{width:28px;height:28px;border-radius:50%;font-size:14px}
 .lv-step b{min-width:18px;text-align:center}
-.lv-bar{position:fixed;left:0;right:0;bottom:0;padding:24px 14px calc(env(safe-area-inset-bottom,0px) + 12px);background:linear-gradient(transparent,#06182a 40%);z-index:6}
+.lv-bar{position:fixed;left:0;right:0;bottom:0;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px);z-index:6;display:flex;justify-content:center;pointer-events:none}
+.lv-bar>*{pointer-events:auto}
+.lv-fab{display:flex;align-items:center;gap:12px;width:100%;max-width:460px;padding:8px 8px 8px 10px;border-radius:999px;border:0;background:linear-gradient(135deg,#ff7a2c,#ff4d1f);color:#fff;font-family:Archivo,Inter,sans-serif;cursor:pointer;box-shadow:0 14px 34px -8px rgba(255,90,44,.65),0 6px 16px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.35);animation:lvfab .4s cubic-bezier(.3,1.5,.5,1);transition:transform .15s}
+.lv-fab:active{transform:scale(.97)}
+.lv-fab .ic{position:relative;display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;background:#fff;color:#ff4d1f;flex:none}
+.lv-fab .ic svg{width:24px;height:24px}
+.lv-fab .ic b{position:absolute;top:-5px;right:-5px;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:#0f172a;color:#fbbf24;border:2px solid #fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.lv-fab .t{flex:1;text-align:left;line-height:1.15}
+.lv-fab .t b{display:block;font-weight:900;font-size:16px}
+.lv-fab .t small{display:block;font-weight:700;font-size:12px;opacity:.9}
+.lv-fab .p{background:#06182a;color:#fbbf24;border-radius:999px;padding:12px 18px;font-weight:900;font-size:17px;white-space:nowrap}
+@keyframes lvfab{0%{transform:scale(.9) translateY(8px)}100%{transform:scale(1) translateY(0)}}
+
+.lv-imgbox{cursor:zoom-in}
+.lv-search{position:relative;margin:0 0 14px}
+.lv-search input{width:100%;box-sizing:border-box;padding:13px 44px 13px 44px;border-radius:999px;border:2px solid #1e4a78;background:#06182a;color:#fff;font-size:15px;font-weight:600;outline:none}
+.lv-search input:focus{border-color:#f59e0b}
+.lv-search .si{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none}
+.lv-search .sx{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:0;background:#12304f;color:#fff;font-size:14px;cursor:pointer;display:none}
+.lv-nores{display:none;text-align:center;padding:26px 10px;color:#a9c6df;font-weight:700}
+.lv{padding-bottom:96px}
+.lv-zoom{position:fixed;inset:0;z-index:100000;background:rgba(2,11,20,.9);display:flex;align-items:center;justify-content:center;padding:16px}
+.lv-zoom-in{width:100%;max-width:520px;background:#0b2238;border:2px solid #1e4a78;border-radius:22px;overflow:hidden;color:#e6f3fc;box-shadow:8px 8px 0 #020b14}
+.lv-zoom-in img{display:block;width:100%;max-height:55vh;object-fit:cover;background:#16344f}
+.lv-zoom-b{padding:16px 18px 18px}
+.lv-zoom-b h3{margin:0 0 6px;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:22px;color:#fff}
+.lv-zoom-b p{margin:0 0 12px;font-size:14px;color:#a9c6df}
+.lv-zoom-r{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.lv-zoom-r .pr{font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:22px;color:#fbbf24}
+.lv-zoom-x{position:absolute;top:14px;right:14px;width:42px;height:42px;border-radius:50%;border:2px solid #1e4a78;background:#06182a;color:#fff;font-size:20px;cursor:pointer}
 .lv-send{display:block;width:100%;max-width:592px;margin:0 auto;padding:14px;border-radius:14px;background:#f59e0b;color:#111!important;font-weight:800;font-size:15px}
 .lv-send.off,.lv-send[disabled]{background:#334155;color:#94a3b8!important}
 .lv-lineW{border-bottom:1px solid #1e3a5f;padding-bottom:10px}
@@ -7635,6 +7666,30 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 var l = logo();
                 return `<div class="lv"><div class="lv-top"><div class="lv-top-in"><div class="lv-brand">${l ? `<img src="${l}">` : ''}<div><b>Marisquería PARGO</b><small>Pedidos para llevar · pagas al recoger</small></div><div class="lv-info-top">Pedidos y reservaciones: 744 294 0816<br>12:30 a 6:30 pm · Sin servicio los miércoles</div></div>${chips ? `<div class="lv-chips">${chips}</div>` : ''}</div></div><div class="lv-body">${b}</div></div>`;
             }
+            function numMap() {
+                var order = MENU_CATEGORIES.map(function (c) { return c.key; }), m = {};
+                var rank = function (c) { var i = order.indexOf(c); return i === -1 ? 999 : i; };
+                MENU.map(function (p, idx) { return { p: p, idx: idx }; })
+                    .sort(function (a, b) { return rank(a.p.category) - rank(b.p.category) || a.idx - b.idx; })
+                    .forEach(function (o, i) { m[o.p.sku] = i + 1; });
+                return m;
+            }
+            function norm(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
+            window.llvSearch = function (v) {
+                var q = norm(v), isNum = /^\d+$/.test(q), shown = 0;
+                var x = document.getElementById('llv-sx'); if (x) x.style.display = q ? 'block' : 'none';
+                document.querySelectorAll('.lv-sec').forEach(function (sec) {
+                    var any = 0;
+                    sec.querySelectorAll('.lv-card').forEach(function (c) {
+                        var ok = !q || (isNum ? c.getAttribute('data-n') === q : (c.getAttribute('data-q') || '').indexOf(q) !== -1);
+                        c.style.display = ok ? '' : 'none'; if (ok) any++;
+                    });
+                    sec.style.display = any ? '' : 'none'; shown += any;
+                });
+                var n = document.getElementById('llv-nores'); if (n) n.style.display = (q && !shown) ? 'block' : 'none';
+            };
+            window.llvSearchClear = function () { var i = document.getElementById('llv-q'); if (i) { i.value = ''; i.focus(); } window.llvSearch(''); };
+            function numBadge(sku) { var n = numMap()[sku]; return n ? '<span class="lv-num">' + n + '</span>' : ''; }
             function items() {
                 return Object.keys(cart).filter(function (k) { return cart[k] > 0; }).map(function (k) {
                     var p = MENU.find(function (x) { return x.sku === k; });
@@ -7657,13 +7712,13 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             }
             function barInner() {
                 var n = cartCount();
-                return n ? `<button class="lv-send" onclick="llvCheckout()">Ver mi pedido · ${n} · ${$m(cartTotal())}</button>` : '<button class="lv-send off" disabled>Elige tus platillos</button>';
+                return n ? `<button class="lv-fab" onclick="llvCheckout()"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><b>${n}</b></span><span class="t"><b>Ver mi pedido</b><small>${n} ${n === 1 ? 'platillo' : 'platillos'} · pagas al recoger</small></span><span class="p">${$m(cartTotal())}</span></button>` : '';
             }
             function saveForm() { ['name', 'phone'].forEach(function (k) { var e = document.getElementById('llv-' + k); if (e) form[k] = e.value; }); }
 
             function cartForm(it) {
                 var lines = it.map(function (i) {
-                    return `<div class="lv-lineW"><div class="lv-line" style="border:0;padding-bottom:6px"><div><b>${esc(i.name)}</b><small>${$m(i.price)} c/u</small></div>${stepper(i.sku, i.qty, true)}<span class="lv-sub">${$m(i.price * i.qty)}</span></div>${noteBox(i.sku)}</div>`;
+                    return `<div class="lv-lineW"><div class="lv-line" style="border:0;padding-bottom:6px"><div><b>${numBadge(i.sku)}${esc(i.name)}</b><small>${$m(i.price)} c/u</small></div>${stepper(i.sku, i.qty, true)}<span class="lv-sub">${$m(i.price * i.qty)}</span></div>${noteBox(i.sku)}</div>`;
                 }).join('');
                 return `<h2 class="lv-h">Tu pedido</h2>${lines}
 <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:800;font-size:16px"><span>Total a pagar al recoger</span><span>${$m(cartTotal())}</span></div>
@@ -7686,8 +7741,17 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 if (!cart[sku]) delete notes[sku];
                 var e = document.getElementById('ctl-' + sku); if (e) e.innerHTML = ctl(sku);
                 var nb = document.getElementById('note-' + sku); if (nb) nb.innerHTML = noteBox(sku);
-                if (desk()) renderSide();
-                else { var b = document.getElementById('llv-bar'); if (b) b.innerHTML = barInner(); }
+                var b = document.getElementById('llv-bar'); if (b) b.innerHTML = barInner();
+                var z = document.getElementById('lv-zoom'); if (z) z.remove();
+            };
+            window.llvZoom = function (sku) {
+                var p = MENU.find(function (x) { return x.sku === sku; }); if (!p) return;
+                var z = document.getElementById('lv-zoom'); if (z) z.remove();
+                z = document.createElement('div'); z.id = 'lv-zoom'; z.className = 'lv-zoom';
+                z.onclick = function (e) { if (e.target === z) z.remove(); };
+                var add = p.available === false ? '<button class="lv-add" disabled>Agotado</button>' : '<button class="lv-send" style="width:auto;padding:12px 22px" onclick="llvQty(\'' + sku + '\',1)">Agregar +</button>';
+                z.innerHTML = '<button class="lv-zoom-x" onclick="document.getElementById(\'lv-zoom\').remove()" aria-label="Cerrar">✕</button><div class="lv-zoom-in"><img alt="' + esc(p.name) + '" src="' + esc(p.image || menuIcon(p.category)) + '" onerror="this.onerror=null;this.src=menuIcon(\'' + p.category + '\')"><div class="lv-zoom-b"><h3>' + numBadge(sku) + esc(p.name) + '</h3>' + (p.desc ? '<p>' + esc(p.desc) + '</p>' : '') + '<div class="lv-zoom-r"><span class="pr">' + $m(p.price) + '</span>' + add + '</div></div></div>';
+                document.body.appendChild(z);
             };
             window.llvGo = function (k) { var e = document.getElementById('cat-' + k); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
             window.llvCheckout = function () { menuScroll = root.scrollTop; view = 'checkout'; renderCheckout(); root.scrollTop = 0; };
@@ -7715,17 +7779,18 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 var avail = MENU.slice(), cats = MENU_CATEGORIES.slice();
                 avail.forEach(function (p) { if (!cats.some(function (c) { return c.key === p.category; })) cats.push({ key: p.category, label: p.category, emoji: '🍽️' }); });
                 cats = cats.filter(function (c) { return avail.some(function (p) { return p.category === c.key; }); });
-                var chips = cats.map(function (c) { return `<a class="lv-chip" onclick="llvGo('${c.key}')">${c.emoji} ${esc(c.label)}</a>`; }).join('');
+                var chips = cats.map(function (c) { return `<a class="lv-chip" onclick="llvGo('${c.key}')">${c.emoji} ${esc(c.label)} <span class="lv-chipn">${avail.filter(function (p) { return p.category === c.key; }).length}</span></a>`; }).join('');
                 var body = cats.map(function (c) {
                     var list = avail.filter(function (p) { return p.category === c.key; });
                     return `<section id="cat-${c.key}" class="lv-sec"><div class="lv-cat"><div class="lv-cat-head"><h2>${esc(c.label)}</h2><span class="lv-count">${list.length} ${list.length === 1 ? 'opción' : 'opciones'}</span></div><div class="lv-grid">` + list.map(function (p) {
-                        return `<div class="lv-card${p.available === false ? ' off' : ''}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox"><img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
+                        return `<div class="lv-card${p.available === false ? ' off' : ''}" data-n="${numMap()[p.sku] || ''}" data-q="${esc(norm(p.name + ' ' + (p.desc || '')))}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${numBadge(p.sku)}${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox" onclick="llvZoom('${p.sku}')"><img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
                     }).join('') + '</div></div></section>';
                 }).join('');
                 var consulta = '<div style="margin:0 0 14px;padding:12px;border-radius:14px;background:#0f172a;border:1px solid #1e293b"><div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:6px">🔎 ¿Ya hiciste un pedido hoy? Consulta cómo va</div><div style="display:flex;gap:8px"><input id="llv-code" class="lv-in" maxlength="4" autocapitalize="characters" placeholder="Tu código (4 letras)" style="margin:0;flex:1;text-transform:uppercase"><button onclick="llvFind()" style="padding:0 16px;border-radius:12px;background:#0284c7;color:#fff;font-weight:800">Ver</button></div><p id="llv-find-err" style="color:#fb7185;font-size:12px;min-height:14px;margin:6px 0 0"></p></div>';
-                var main = '<div class="lv-main">' + consulta + body + '</div>';
-                var layout = desk() ? `<div class="lv-layout">${main}<aside id="lv-side" class="lv-side">${sideHtml()}</aside></div>` : main;
-                root.innerHTML = shell(layout, chips, true) + (desk() ? '' : `<div id="llv-bar" class="lv-bar">${barInner()}</div>`);
+                var search = '<div class="lv-search"><span class="si">🔍</span><input id="llv-q" type="search" inputmode="search" autocomplete="off" placeholder="Buscar platillo o número (ej. 12, camarón)" oninput="llvSearch(this.value)"><button id="llv-sx" class="sx" onclick="llvSearchClear()" aria-label="Borrar">✕</button></div>';
+                var main = '<div class="lv-main">' + search + '<div id="llv-nores" class="lv-nores">No encontramos ese platillo 🦐<br><small>Prueba con otra palabra o número</small></div>' + consulta + body + '</div>';
+                var layout = main;
+                root.innerHTML = shell(layout, chips, true) + `<div id="llv-bar" class="lv-bar">${barInner()}</div>`;
             }
             function renderCheckout() {
                 var it = items();
@@ -8103,7 +8168,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         var wait = setInterval(function () {
             if (started || typeof cloudDb === 'undefined' || !cloudDb) return;
             started = true; clearInterval(wait); fab.style.display = 'flex'; document.documentElement.classList.add('llv-ready');
-            try { if (localStorage.getItem('llv_open') === '1') { open = true; panel.style.display = 'block'; } } catch (e) {}
+            try { localStorage.setItem('llv_open', '0'); } catch (e) {}
             cloudDb.collection(COL).orderBy('createdAt', 'desc').limit(60).onSnapshot(function (s) {
                 var cut = Date.now() - 36 * 3600 * 1000;
                 orders = s.docs.map(function (d) { return Object.assign({ _id: d.id }, d.data()); }).filter(function (o) { return !o.cleared && new Date(o.createdAt).getTime() > cut; });
