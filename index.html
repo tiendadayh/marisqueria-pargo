@@ -6442,9 +6442,14 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         function dayKeyAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return dayKeyOf(d); }
         function saleDayKey(s) { return s && s.closedAt ? dayKeyOf(new Date(s.closedAt)) : localDayKey(); }
         function corteDayPicked() { const i = document.getElementById('corte-date'); return (i && i.value) || localDayKey(); }
+        function corteWeekStart() { const d = new Date(); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return dayKeyOf(d); } // lunes de esta semana
+        function corteMonthStart() { const d = new Date(); d.setDate(1); return dayKeyOf(d); }
+        function corteYearStart() { const d = new Date(); d.setMonth(0, 1); return dayKeyOf(d); }
         function corteBase() {
             if (corteRange === 'all') return salesHistory;
-            if (corteRange === 'week') { const from = dayKeyAgo(6); return salesHistory.filter(s => saleDayKey(s) >= from); }
+            if (corteRange === 'week') { const from = corteWeekStart(); return salesHistory.filter(s => saleDayKey(s) >= from); }
+            if (corteRange === 'month') { const from = corteMonthStart(); return salesHistory.filter(s => saleDayKey(s) >= from); }
+            if (corteRange === 'year') { const from = corteYearStart(); return salesHistory.filter(s => saleDayKey(s) >= from); }
             const day = corteRange === 'today' ? localDayKey() : corteRange === 'yesterday' ? dayKeyAgo(1) : corteDayPicked();
             return salesHistory.filter(s => saleDayKey(s) === day);
         }
@@ -6552,10 +6557,10 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             // Periodo elegido
             { const rc = document.getElementById('corte-range-chips');
               if (rc) { const c = (k, l) => `<button type="button" onclick="setCorteRange('${k}')" class="caja-fchip ${corteRange === k ? 'on' : ''}">${l}</button>`;
-                rc.innerHTML = c('today', 'Hoy') + c('yesterday', 'Ayer') + c('week', 'Últimos 7 días') + c('all', 'Todo') + `<button type="button" onclick="openCortePicker()" class="caja-fchip ${corteRange === 'day' ? 'on' : ''}"><i class="fa-regular fa-calendar"></i>Otro día</button>`; }
+                rc.innerHTML = c('today', 'Hoy') + c('yesterday', 'Ayer') + c('week', 'Esta semana') + c('month', 'Este mes') + c('year', 'Este año') + `<button type="button" onclick="openCortePicker()" class="caja-fchip ${corteRange === 'day' ? 'on' : ''}"><i class="fa-regular fa-calendar"></i>Otro día</button>`; }
               const rl = document.getElementById('corte-range-label');
               if (rl) { const fd = k => new Date(k + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-                rl.textContent = corteRange === 'today' ? 'Hoy · ' + fd(localDayKey()) : corteRange === 'yesterday' ? 'Ayer · ' + fd(dayKeyAgo(1)) : corteRange === 'week' ? 'Del ' + fd(dayKeyAgo(6)) + ' a hoy' : corteRange === 'all' ? 'Todas las ventas registradas' : fd(corteDayPicked()); } }
+                rl.textContent = corteRange === 'today' ? 'Hoy · ' + fd(localDayKey()) : corteRange === 'yesterday' ? 'Ayer · ' + fd(dayKeyAgo(1)) : corteRange === 'week' ? 'Esta semana · del ' + fd(corteWeekStart()) + ' a hoy' : corteRange === 'month' ? 'Este mes · ' + new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }) : corteRange === 'year' ? 'Este año · ' + new Date().getFullYear() : corteRange === 'all' ? 'Todas las ventas registradas' : fd(corteDayPicked()); } }
             renderCuadre(sum(mesaSales.filter(s => !isTrf(s))), sum(webSales.filter(s => !isTrf(s))));
 
             // Desglose por mesera (solo ventas en mesa)
