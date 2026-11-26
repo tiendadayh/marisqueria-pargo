@@ -8269,6 +8269,15 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             cloudDb.collection(COL).orderBy('createdAt', 'desc').limit(60).onSnapshot(function (s) {
                 var cut = Date.now() - 36 * 3600 * 1000;
                 orders = s.docs.map(function (d) { return Object.assign({ _id: d.id }, d.data()); }).filter(function (o) { return !o.cleared && new Date(o.createdAt).getTime() > cut; });
+                // El número de orden se asigna al LLEGAR el pedido web (no cuando se acepta), para que la cocina respete el orden de llegada
+                try {
+                    if (isAdmin() && typeof isAdminUnlocked !== 'undefined' && isAdminUnlocked) {
+                        var today = new Date().toDateString();
+                        orders.slice().sort(function (a, b) { return new Date(a.createdAt) - new Date(b.createdAt); }).forEach(function (o) {
+                            if (o.status === 'nuevo' && new Date(o.createdAt).toDateString() === today && !((storeConfig.webSeq || {})[o._id])) assignWebSeq(o._id);
+                        });
+                    }
+                } catch (e) {}
                 badge(); considerAlerts(); render(); try { renderKitchenView(); } catch (e) {} recoverSales();
             }, function (e) { console.error('pargo_llevar listen', e); });
         }, 1000);
