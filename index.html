@@ -1005,7 +1005,7 @@
                         <div class="p-4 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-950/50">
                             <div id="corte-filter-chips" class="flex flex-wrap items-center gap-2"></div>
                             <button onclick="clearSalesData()" class="caja-tool bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30"><i class="fa-solid fa-rotate-left"></i> Reiniciar ventas</button>
-                            <button onclick="resetFolios()" class="caja-tool bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"><i class="fa-solid fa-hashtag"></i> Reiniciar folios (#001)</button>
+                            <button onclick="resetFolios()" class="caja-tool bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"><i class="fa-solid fa-hashtag"></i> Reiniciar folios mesas + web (#001)</button>
                         </div>
                         <div class="overflow-auto" style="max-height:30rem">
                             <table class="caja-tbl w-full text-left text-xs">
@@ -3967,7 +3967,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const closed = sale.closedAt ? new Date(sale.closedAt) : null;
             currentTicketData = {
                 kind: 'venta', tableId: null, saleFolio: sale.id, businessName: storeConfig.businessName || 'Marisquería Pargo',
-                tableName: sale.tableName, guests: sale.guests, waiter: sale.waiter, folio: sale.id, method: sale.method || 'Efectivo',
+                tableName: sale.tableName, guests: sale.guests, waiter: sale.waiter, folio: (sale.folioNum ? kitchenNumLabel(sale.folioNum) + ' · ' + sale.id : sale.id), method: sale.method || 'Efectivo',
                 dateStr: closed ? closed.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
                 timeStr: closed ? closed.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : (sale.time || '—'),
                 when: closed ? closed.toLocaleString('es-MX') : sale.time,
@@ -3990,83 +3990,112 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (typeof html2pdf === 'undefined') throw new Error('Sin generador de PDF');
             const d = currentTicketData;
             if (!d) throw new Error('Sin datos de ticket');
-            const logo = document.getElementById('ticket-logo');
-            try { if (logo && logo.src) await logo.decode(); } catch (e) {}
             const safeName = (storeConfig.businessName || 'Ticket').replace(/[^a-zA-Z0-9_-]/g, '_');
             const fileName = `Ticket_${safeName}_${Date.now()}.pdf`;
 
-            // Ticket térmico: 80 mm de ancho (302 px a 96 dpi), blanco y negro, alto a la medida
-            const money = formatTicketMoney, esc = escapeHtmlText;
+            // Se obtiene la clase jsPDF que ya viene dentro de html2pdf (sin capturar pantalla)
+            const tiny = document.createElement('canvas'); tiny.width = 4; tiny.height = 4;
+            const seed = await html2pdf().from(tiny, 'canvas').toPdf().get('pdf');
+            const JsPDF = seed.constructor;
+
+            // Logo en PNG (si existe)
+            let logoData = null, logoRatio = 1;
+            try {
+                const logo = document.getElementById('ticket-logo');
+                const wrap = document.getElementById('ticket-logo-wrap');
+                if (logo && logo.src && wrap && !wrap.classList.contains('hidden')) {
+                    try { await logo.decode(); } catch (e) {}
+                    const c = document.createElement('canvas');
+                    c.width = logo.naturalWidth; c.height = logo.naturalHeight;
+                    const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.drawImage(logo, 0, 0);
+                    logoData = c.toDataURL('image/png'); logoRatio = c.width / c.height;
+                }
+            } catch (e) { logoData = null; }
+
+            const W = 80, M = 4, CW = W - M * 2, PT = 0.3528;
             const isSale = d.kind === 'venta';
             const items = d.items || [];
             const count = items.reduce((s, i) => s + (i.qty || 0), 0);
-            const hasLogo = !!(logo && logo.src && !document.getElementById('ticket-logo-wrap').classList.contains('hidden'));
-            const logoH = 46, logoW = hasLogo && logo.naturalWidth ? Math.round(logoH * logo.naturalWidth / logo.naturalHeight) : logoH;
-            const dash = 'border-top:1px dashed #000;margin:7px 0;';
-            const row = (k, v) => `<div style="display:flex;justify-content:space-between;gap:8px;"><span>${esc(String(k))}</span><span style="text-align:right;font-weight:700;">${esc(String(v))}</span></div>`;
+            const money = formatTicketMoney;
             const waiterStaff = (typeof staff !== 'undefined') ? staff.find(s => s.name === d.waiter) : null;
             const waiterLabel = (waiterStaff && waiterStaff.role) ? waiterStaff.role : 'Atendió';
-            const itemsHtml = items.length ? items.map(i => `
-                <div style="margin-bottom:5px;">
-                    <div style="font-weight:700;">${esc(i.name)}</div>
-                    <div style="display:flex;justify-content:space-between;"><span>${i.qty} x ${money(i.price)}</span><span style="font-weight:700;">${money(i.price * i.qty)}</span></div>
-                    ${i.notes ? `<div style="font-size:10px;font-style:italic;">Nota: ${esc(i.notes)}</div>` : ''}
-                </div>`).join('')
-                : (isSale ? `<div style="display:flex;justify-content:space-between;"><span>Consumo cerrado (${esc(d.method || 'Efectivo')})</span><span style="font-weight:700;">${money(d.total)}</span></div>` : '<div style="text-align:center;">Sin productos en la cuenta</div>');
             const wifi = (storeConfig.hasWifi && (storeConfig.wifiSsid || storeConfig.wifiPass)) ? `Wi-Fi: ${storeConfig.wifiSsid || 'Disponible'}${storeConfig.wifiPass ? ' · Clave: ' + storeConfig.wifiPass : ''}` : '';
 
-            const host = document.createElement('div');
-            host.style.cssText = 'position:fixed;left:-10000px;top:0;width:302px;background:#fff;';
-            host.innerHTML = `
-                <div id="ticket-thermal" style="width:302px;box-sizing:border-box;padding:12px 14px 16px;background:#fff;color:#000;font-family:'Courier New',Courier,monospace;font-size:11.5px;line-height:1.35;">
-                    <div style="text-align:center;">
-                        ${hasLogo ? `<img src="${logo.src}" style="height:${logoH}px;width:${logoW}px;display:block;margin:0 auto 4px;filter:grayscale(1) contrast(1.2);">` : ''}
-                        <div style="font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;">${esc(String(d.businessName))}</div>
-                        <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;">${isSale ? 'Ticket de venta' : 'Cuenta · Ticket de consumo'}</div>
-                    </div>
-                    <div style="${dash}"></div>
-                    ${row('Folio', isSale ? d.folio : 'Cuenta abierta')}
-                    ${row('Fecha', d.dateStr || '—')}
-                    ${row('Hora', d.timeStr || '—')}
-                    ${row('Mesa', d.tableName)}
-                    ${row('Personas', d.guests ? d.guests : '—')}
-                    ${row(waiterLabel, d.waiter || '—')}
-                    <div style="${dash}"></div>
-                    <div style="display:flex;justify-content:space-between;font-weight:900;font-size:10px;text-transform:uppercase;"><span>Cant x P.Unit</span><span>Importe</span></div>
-                    <div style="border-top:1px solid #000;margin:3px 0 5px;"></div>
-                    ${itemsHtml}
-                    <div style="${dash}"></div>
-                    ${row('Artículos', count)}
-                    ${row('Subtotal', money(d.total))}
-                    <div style="border-top:1px solid #000;margin:5px 0 3px;"></div>
-                    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;"><span>${isSale ? 'TOTAL PAGADO' : 'TOTAL'}</span><span>${money(d.total)}</span></div>
-                    <div style="border-top:1px solid #000;margin:3px 0 5px;"></div>
-                    ${isSale ? `<div style="text-align:center;font-size:10.5px;">Forma de pago: ${esc(d.method || 'Efectivo')}</div>` : ''}
-                    <div style="${dash}"></div>
-                    <div style="text-align:center;">
-                        <div style="font-weight:900;font-size:12px;">¡Gracias por su visita!</div>
-                        <div style="font-size:10px;">Esperamos verle pronto</div>
-                        ${wifi ? `<div style="font-size:10px;margin-top:3px;">${esc(wifi)}</div>` : ''}
-                        <div style="font-size:9px;margin-top:4px;">${isSale ? 'Gracias por tu visita y tu preferencia. “Del mar a tu paladar”. Pedidos y reservaciones: 744 294 0816.' : 'Cuenta preliminar: no es comprobante de pago.'}</div>
-                    </div>
-                </div>`;
-            document.body.appendChild(host);
-            try {
-                const el = host.firstElementChild;
-                const imgs = Array.from(host.querySelectorAll('img'));
-                await Promise.all(imgs.map(im => im.decode ? im.decode().catch(() => {}) : Promise.resolve()));
-                const canvas = await html2pdf().set({ html2canvas: { scale: 3, useCORS: true, logging: false, backgroundColor: '#ffffff' } }).from(el).toCanvas().get('canvas');
-                const pageW = 80;                                   // mm, rollo térmico estándar
-                const pageH = Math.ceil(canvas.height / canvas.width * pageW);  // alto exacto, una sola hoja
-                const blob = await html2pdf().set({
-                    margin: 0, filename: fileName,
-                    image: { type: 'jpeg', quality: 0.95 },
-                    jsPDF: { unit: 'mm', format: [pageW, pageH], orientation: 'portrait' }
-                }).from(canvas, 'canvas').outputPdf('blob');
-                return { blob, fileName };
-            } finally {
-                host.remove();
+            function draw(doc) {
+                let y = M;
+                const font = (size, bold) => { doc.setFont('courier', bold ? 'bold' : 'normal'); doc.setFontSize(size); return size * PT * 1.2; };
+                const center = (t, size, bold) => {
+                    const lh = font(size, bold);
+                    doc.splitTextToSize(String(t), CW).forEach(l => { y += lh; doc.text(l, W / 2, y - lh * 0.2, { align: 'center' }); });
+                };
+                const lr = (l, r, size, bold) => {
+                    const lh = font(size, bold);
+                    const rw = doc.getTextWidth(String(r));
+                    const lines = doc.splitTextToSize(String(l), Math.max(10, CW - rw - 2));
+                    lines.forEach((ln, i) => {
+                        y += lh;
+                        doc.text(ln, M, y - lh * 0.2);
+                        if (i === 0) doc.text(String(r), W - M, y - lh * 0.2, { align: 'right' });
+                    });
+                };
+                const left = (t, size, bold) => {
+                    const lh = font(size, bold);
+                    doc.splitTextToSize(String(t), CW).forEach(l => { y += lh; doc.text(l, M, y - lh * 0.2); });
+                };
+                const dash = () => { y += 1.5; doc.setLineWidth(0.2); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(M, y, W - M, y); doc.setLineDashPattern([], 0); y += 1.5; };
+                const solid = () => { y += 1; doc.setLineWidth(0.3); doc.line(M, y, W - M, y); y += 1; };
+
+                doc.setTextColor(0, 0, 0); doc.setDrawColor(0, 0, 0);
+                if (logoData) {
+                    const h = 14, w = h * logoRatio;
+                    try { doc.addImage(logoData, 'PNG', (W - w) / 2, y, w, h); y += h + 2; } catch (e) {}
+                }
+                center(String(d.businessName).toUpperCase(), 12, true);
+                center(isSale ? 'TICKET DE VENTA' : 'CUENTA - TICKET DE CONSUMO', 7.5, false);
+                dash();
+                lr('Folio', isSale ? d.folio : 'Cuenta abierta', 8.5, false);
+                lr('Fecha', d.dateStr || '-', 8.5, false);
+                lr('Hora', d.timeStr || '-', 8.5, false);
+                lr('Mesa', d.tableName || '-', 8.5, false);
+                lr('Personas', d.guests ? d.guests : '-', 8.5, false);
+                lr(waiterLabel, d.waiter || '-', 8.5, false);
+                dash();
+                lr('CANT x P.UNIT', 'IMPORTE', 7.5, true);
+                solid();
+                if (items.length) {
+                    items.forEach(i => {
+                        left(i.name, 8.5, true);
+                        lr(`${i.qty} x ${money(i.price)}`, money(i.price * i.qty), 8.5, false);
+                        if (i.notes) left('Nota: ' + i.notes, 7.5, false);
+                        y += 1.2;
+                    });
+                } else if (isSale) {
+                    lr(`Consumo cerrado (${d.method || 'Efectivo'})`, money(d.total), 8.5, true);
+                } else {
+                    center('Sin productos en la cuenta', 8.5, false);
+                }
+                dash();
+                lr('Articulos', count, 8.5, false);
+                lr('Subtotal', money(d.total), 8.5, false);
+                solid();
+                lr(isSale ? 'TOTAL PAGADO' : 'TOTAL', money(d.total), 12, true);
+                solid();
+                if (isSale) center('Forma de pago: ' + (d.method || 'Efectivo'), 8, false);
+                dash();
+                center('¡Gracias por su visita!', 9, true);
+                center('Esperamos verle pronto', 7.5, false);
+                if (wifi) { y += 1; center(wifi, 7.5, false); }
+                y += 1;
+                center(isSale ? 'Gracias por tu visita y tu preferencia. "Del mar a tu paladar". Pedidos y reservaciones: 744 294 0816.' : 'Cuenta preliminar: no es comprobante de pago.', 6.5, false);
+                return y + M;
             }
+
+            // 1ª pasada: medir alto; 2ª pasada: hoja exacta de 80 mm de ancho
+            const measure = new JsPDF({ unit: 'mm', format: [W, 2000] });
+            const H = Math.max(60, Math.ceil(draw(measure)));
+            const doc = new JsPDF({ unit: 'mm', format: [W, H] });
+            draw(doc);
+            return { blob: doc.output('blob'), fileName };
         }
 
         // Se prepara el PDF mientras la mesera revisa el ticket, para que al tocar "Enviar" salga al instante
@@ -8279,7 +8308,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                     var sid = 'LL-' + o.code;
                     if (salesHistory.some(function (x) { return x.id === sid; })) return;
                     var its = (o.items || []).map(function (i) { return { sku: i.sku || '', name: i.name, price: priceOf(i), qty: i.qty, notes: i.note || '' }; });
-                    salesHistory.push({ id: sid, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date(o.paidAt).toLocaleTimeString('es-MX'), closedAt: o.paidAt, method: o.method || 'Efectivo', guests: 0, phone: o.phone || '', proof: '', partial: false, items: its, total: totalOf(o) });
+                    salesHistory.push({ id: sid, folioNum: webFolioNum(o) || 0, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date(o.paidAt).toLocaleTimeString('es-MX'), closedAt: o.paidAt, method: o.method || 'Efectivo', guests: 0, phone: o.phone || '', proof: '', partial: false, items: its, total: totalOf(o) });
                     markSalePending(sid); n++;
                 });
                 if (!n) return;
@@ -8295,7 +8324,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             if (o.status !== 'cocinado' && o.status !== 'listo') { showToast('No se puede cobrar: cocina aún no termina este pedido', 'warning'); return; }
             if (!webArrivedGet(id)) { showToast('No se puede cobrar: marca primero que el cliente llegó', 'warning'); return; }
             var its = o.items.map(function (i) { return { sku: i.sku || '', name: i.name, price: priceOf(i), qty: i.qty, notes: i.note || '' }; });
-            salesHistory.unshift({ id: 'LL-' + o.code, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date().toLocaleTimeString('es-MX'), closedAt: new Date().toISOString(), method: method, guests: 0, phone: o.phone, proof: '', partial: false, items: its, total: totalOf(o) });
+            salesHistory.unshift({ id: 'LL-' + o.code, folioNum: webFolioNum(o) || 0, tableName: 'Para llevar · ' + o.name, waiter: 'Para llevar', time: new Date().toLocaleTimeString('es-MX'), closedAt: new Date().toISOString(), method: method, guests: 0, phone: o.phone, proof: '', partial: false, items: its, total: totalOf(o) });
             markSalePending('LL-' + o.code); saveData(); upd(id, { status: 'entregado', method: method, paidAt: new Date().toISOString() }); showToast('Cobrado ' + $m(totalOf(o)) + ' (' + method + ')', 'success'); try { askTicketPdf('LL-' + o.code); } catch (e) {}
         };
         // Reiniciar ventas: borra también el "Historial de hoy" de pedidos para llevar (entregados y cancelados). Los pendientes NO se tocan.
@@ -8412,6 +8441,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             var q = (typeof storeConfig !== 'undefined' && storeConfig.webSeq) || {};
             return orders.filter(function (o) { return (o.status === 'cocina' || o.status === 'preparando') && q[o._id]; }).map(function (o) { return { id: o._id, name: o.name, n: q[o._id], at: o.acceptedAt || o.createdAt, status: o.status }; });
         };
+        function webFolioNum(o) { return ((typeof storeConfig !== 'undefined' && storeConfig.webSeq) || {})[o._id] || 0; }
         function seqTag(o) { var q = (typeof storeConfig !== 'undefined' && storeConfig.webSeq || {})[o._id]; return q ? '<span style="color:#fbbf24">' + kitchenNumLabel(q) + ' · WEB</span> ' : ''; }
         window.llvArrived = function (id) { webArrivedSet(id); render(); showToast('Cliente marcado como llegado', 'success'); };
         window.llvAck = function (k, view) { delete alerts[k]; drawAlerts(); if (view) { open = true; panel.style.display = 'block'; try { localStorage.setItem('llv_open', '1'); } catch (e) {} render(); } };
@@ -8440,7 +8470,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             return '<div style="border:1px solid ' + edge + ';border-left:6px solid ' + edge + ';border-radius:14px;padding:14px;background:#0f172a;' + (late ? 'box-shadow:0 8px 24px -12px #ef4444;' : '') + '">' +
                 (late ? '<div style="margin:-4px -4px 10px;padding:6px 10px;border-radius:8px;background:#7f1d1d;color:#fecaca;font-size:12px;font-weight:800">⚠️ Lleva ' + m + ' min en este paso</div>' : '') +
                 '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span style="padding:4px 10px;border-radius:9999px;background:' + col + '22;color:' + col + ';border:1px solid ' + col + '66;font-size:11px;font-weight:900;letter-spacing:.04em">' + stl + '</span><span style="padding:4px 10px;border-radius:9999px;background:' + tcol + '22;color:' + tcol + ';font-size:13px;font-weight:900">⏱ ' + m + ' min</span></div>' +
-                '<div style="margin-top:10px;font-size:20px;font-weight:900;color:#fff">' + seqTag(o) + '#' + esc(o.code) + ' · ' + esc(o.name) + '</div>' +
+                '<div style="margin-top:10px;font-size:20px;font-weight:900;color:#fff">' + (webFolioNum(o) ? '<span style="display:inline-block;margin-right:8px;padding:2px 10px;border-radius:10px;background:#fbbf24;color:#0f172a;font-size:24px;letter-spacing:.02em">Folio ' + kitchenNumLabel(webFolioNum(o)) + '</span><span style="font-size:11px;color:#fbbf24;margin-right:6px">WEB</span>' : '#' + esc(o.code) + ' · ') + esc(o.name) + '</div>' +
+                '<div style="font-size:11px;color:#64748b;margin-top:2px">Código del pedido: ' + esc(o.code) + '</div>' +
                 '<div style="font-size:12px;color:#94a3b8;margin-top:2px">📞 <a href="tel:' + esc(o.phone) + '" style="color:#7dd3fc">' + esc(o.phone) + '</a> · Pedido a las ' + hora(o.createdAt) + '</div>' +
                 ((o.status === 'preparando' || o.status === 'cocina') ? (function () { var tk = ticksGet(o._id), tot = (o.items || []).length, dn = (o.items || []).filter(function (_, k) { return tk.indexOf(k) >= 0; }).length; return '<div style="margin-top:8px;font-size:12px;font-weight:800;color:' + (dn === tot && tot ? '#34d399' : '#fbbf24') + '">👨‍🍳 Cocina: ' + dn + ' de ' + tot + ' platillos listos</div>'; })() : '') +
                 '<div style="margin:10px 0;border-top:1px solid #1e293b">' + (o.items || []).map(function (i, ix) { var on = ticksGet(o._id).indexOf(ix) >= 0 && (o.status === 'preparando' || o.status === 'cocina' || o.status === 'cocinado'); return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #1e293b' + (on ? ';opacity:.75' : '') + '"><span style="min-width:34px;text-align:center;padding:2px 0;border-radius:8px;background:' + (on ? '#10b981' : '#1e293b') + ';color:' + (on ? '#fff' : '#fbbf24') + ';font-weight:900;font-size:14px">' + (on ? '✓ ' : '') + i.qty + '×</span><div style="flex:1;font-size:15px;font-weight:700;color:' + (on ? '#64748b' : '#f1f5f9') + ';' + (on ? 'text-decoration:line-through' : '') + '">' + esc(i.name) + (i.note ? '<div style="font-size:12px;color:#fbbf24;font-weight:700">📝 ' + esc(i.note) + '</div>' : '') + '</div></div>'; }).join('') + '</div>' +
@@ -8471,7 +8502,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             h += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px"><button onclick="llvSound()" style="' + bt + 'background:#475569">🔔 Probar sonido / activar avisos</button>' + (adm ? '<button onclick="llvToggle()" style="' + bt + 'background:' + (storeConfig.takeoutOpen === false ? '#be123c' : '#059669') + '">' + (storeConfig.takeoutOpen === false ? 'Pausado · tocar para abrir' : 'Abierto · tocar para pausar') + '</button><button onclick="llvCopy()" style="' + bt + 'background:#0ea5e9">Copiar enlace</button><button onclick="llvQrDownload()" style="' + bt + 'background:#7c3aed">⬇️ Descargar QR (imagen)</button><div id="llv-qr" style="background:#fff;padding:6px;border-radius:8px"></div>' : '') + '</div>';
             if (!nuevos.length && !coc.length && !ent.length) h += '<p style="color:#94a3b8;padding:20px 0">No hay pedidos pendientes.</p>';
             h += section('🆕 Nuevos · por aceptar', '#38bdf8', nuevos, adm, bt) + section('🔥 En cocina', '#fbbf24', coc, adm, bt) + section('🍽️ Listos · por entregar', '#f472b6', ent, adm, bt);
-            if (r !== 'cocina' && hist.length) h += '<div style="margin-bottom:18px"><h3 style="font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#34d399;margin:0 0 8px">✅ Historial de hoy (' + hist.length + ')</h3><div style="background:#0f172a;border-radius:12px;overflow:hidden">' + hist.map(function (o) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid #1e293b;font-size:13px"><span><b>#' + esc(o.code) + '</b> · ' + esc(o.name) + '</span><span style="color:' + (o.status === 'cancelado' ? '#f87171' : '#34d399') + '">' + (o.status === 'cancelado' ? 'Cancelado' : (adm ? $m(totalOf(o)) + ' · ' : '') + esc(o.method || '') + ' ' + hora(o.paidAt || o.updatedAt)) + '</span></div>'; }).join('') + '</div></div>';
+            if (r !== 'cocina' && hist.length) h += '<div style="margin-bottom:18px"><h3 style="font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#34d399;margin:0 0 8px">✅ Historial de hoy (' + hist.length + ')</h3><div style="background:#0f172a;border-radius:12px;overflow:hidden">' + hist.map(function (o) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid #1e293b;font-size:13px"><span>' + (webFolioNum(o) ? '<b style="color:#fbbf24">' + kitchenNumLabel(webFolioNum(o)) + '</b> · ' : '') + '<b>#' + esc(o.code) + '</b> · ' + esc(o.name) + '</span><span style="color:' + (o.status === 'cancelado' ? '#f87171' : '#34d399') + '">' + (o.status === 'cancelado' ? 'Cancelado' : (adm ? $m(totalOf(o)) + ' · ' : '') + esc(o.method || '') + ' ' + hora(o.paidAt || o.updatedAt)) + '</span></div>'; }).join('') + '</div></div>';
             panel.innerHTML = h + '</div>';
             if (adm && window.QRCode && document.getElementById('llv-qr')) { try { new QRCode(document.getElementById('llv-qr'), { text: link(), width: 96, height: 96 }); } catch (e) {} }
         }
