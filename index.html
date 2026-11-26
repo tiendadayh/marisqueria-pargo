@@ -1765,6 +1765,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         let kitchenLocked = false;
         let waiterLocked = false;
         let customerPhoneDraft = '';
+        let customerCatFilter = 'all', customerNumQ = '', customerMenuOpen = null;
         let currentTicketData = null;
         let cloudSyncStatus = { state: 'connecting', msg: 'Conectando…' };
         let lastCloudErrorToastAt = 0;
@@ -1999,29 +2000,25 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             return '';
         }
         function webQueueRaw() { try { return (typeof window.llvKitchenOrders === 'function' ? window.llvKitchenOrders() : []).slice().sort((a, b) => a.n - b.n); } catch (e) { return []; } }
-        function webKitchenEntries(tk) {
-            const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1)), out = [];
+        function webKitchenEntries(tk, selfId) {
+            const out = [];
             webQueueRaw().forEach(w => {
-                const earlier = tk.filter(x => (x.k.n || 0) < w.n).length + out.filter(x => x.k.n < w.n).length;
-                out.push({ t: { id: 0, name: 'WEB · ' + w.name }, k: { id: 'W' + w.id, n: w.n, at: w.at, kind: 'order', status: earlier >= n ? 'new' : 'cooking', items: [] } });
+                if (selfId && ('W' + w.id) === selfId) return;
+                out.push({ t: { id: 0, name: 'WEB · ' + w.name }, k: { id: 'W' + w.id, n: w.n, at: w.at, kind: 'order', status: w.status === 'preparando' ? 'cooking' : 'new', items: [] } });
             });
             return out;
         }
         window.kitchenWebBlocker = function (wid) {
-            const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
-            const webs = webQueueRaw(), me = webs.find(w => w.id === wid);
-            if (!me) return null;
-            const tk = allKitchenTickets().filter(x => x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
-            const earlier = tk.filter(x => (x.k.n || 0) < me.n).concat(webs.filter(w => w.n < me.n).map(w => ({ t: { name: 'WEB · ' + w.name }, k: { id: 'W' + w.id, n: w.n } })));
-            earlier.sort((a, b) => (a.k.n || 0) - (b.k.n || 0));
-            return earlier.length >= n ? earlier[0] : null;
+            const me = webQueueRaw().find(w => w.id === wid);
+            if (!me || me.status === 'preparando') return null;
+            return kitchenBlocker({ id: 'W' + wid, n: me.n, at: me.at, kind: 'order', status: 'new' });
         };
         // Prioridad: no se puede empezar un pedido mientras haya uno anterior sin terminar
         function kitchenBlocker(k) {
             if (!k || k.kind === 'cancel') return null;
             const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
             const tk = allKitchenTickets().filter(x => x.k.id !== k.id && x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
-            const act = tk.concat(webKitchenEntries(tk));
+            const act = tk.concat(webKitchenEntries(tk, k.id));
             const before = x => (x.k.n || 0) < (k.n || 0) || ((x.k.n || 0) === (k.n || 0) && String(x.k.at) < String(k.at));
             // 1) hay un pedido anterior que aún no se empieza: ese va primero
             const waiting = act.find(x => x.k.status === 'new' && before(x));
@@ -2117,6 +2114,18 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             let n = 0;
             (table.kitchen || []).forEach(k => { if (k.kind !== 'cancel' && k.status === 'ready') (k.items || []).forEach(i => { if (i.sku === sku && !i.delivered) n += i.qty; }); });
             return n;
+        }
+        // Notas del platillo: las ya confirmadas viajan en los tickets de cocina; las nuevas viven en item.notes
+        function itemNoteParts(table, item) {
+            const parts = [];
+            ((table && table.kitchen) || []).forEach(k => { if (k.kind === 'cancel') return; (k.items || []).forEach(i => { if (i.sku === item.sku && i.notes) parts.push({ qty: i.qty, text: i.notes }); }); });
+            if (item.notes) parts.push({ qty: getPendingQty(item), text: item.notes, pending: true });
+            return parts;
+        }
+        function itemNotesHtml(table, item, cls) {
+            const p = itemNoteParts(table, item); if (!p.length) return '';
+            const single = p.length === 1 && p[0].qty === item.qty;
+            return p.map(x => `<p class="${cls || 'text-[10px] text-amber-300 italic font-semibold'}">📝 ${single ? '' : x.qty + '× '}${escapeHtmlText(x.text)}${x.pending ? ' (por confirmar)' : ''}</p>`).join('');
         }
         function itemKitchenBadgesHtml(table, item) {
             if (!table || !item) return '';
@@ -2291,7 +2300,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     return `
                     <button type="button" ${can ? `onclick="deliverKitchenItem(${table.id},'${k.id}',${idx})"` : 'disabled'} class="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg border ${i.delivered ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200' : (can ? 'bg-slate-950/60 border-slate-700 text-slate-200' : 'bg-slate-950/30 border-slate-800 text-slate-500 cursor-not-allowed')}">
                         <span class="w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-xs font-black ${i.delivered ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-transparent border border-slate-600'}">✓</span>
-                        <span class="text-xs font-bold">${i.qty}× ${dishBadge(i.num)}${escapeHtmlText(i.name)}${isDrinkItem(i) && !i.delivered ? ' <span class="text-cyan-300">🍺 llévala ya</span>' : ''}${i.delivered ? ' · entregado' : (hecho ? ' <span class="text-emerald-300">· ✅ listo en cocina, llévalo</span>' : (!can ? ' · 🔥 en preparación' : ''))}</span>
+                        <span class="text-xs font-bold">${i.qty}× ${dishBadge(i.num)}${escapeHtmlText(i.name)}${i.notes ? ` <span class="text-amber-300 italic">📝 ${escapeHtmlText(i.notes)}</span>` : ''}${isDrinkItem(i) && !i.delivered ? ' <span class="text-cyan-300">🍺 llévala ya</span>' : ''}${i.delivered ? ' · entregado' : (hecho ? ' <span class="text-emerald-300">· ✅ listo en cocina, llévalo</span>' : (!can ? ' · 🔥 en preparación' : ''))}</span>
                     </button>`; }).join('');
                 return `<div class="border rounded-xl p-2.5 space-y-1.5 ${l[1]}">
                     <p class="text-xs font-extrabold"><i class="fa-solid fa-fire-burner mr-1.5"></i>${k.drinksOnly ? 'Bebidas · listas para llevar 🍺' : `Cocina ${kitchenNumLabel(k.n)} · ${l[0]}${prog}`}</p>
@@ -4715,7 +4724,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                             <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${item.name}</h5>
                             <p class="text-[10px] text-slate-400">$${item.price.toFixed(2)} c/u · total ${item.qty}</p>
                             ${dishDescHtml(item.sku, 'text-[10px] text-slate-500 leading-snug')}
-                            ${item.notes ? `<p class="text-[9px] text-amber-300 italic">"${item.notes}"</p>` : ''}
+                            ${itemNotesHtml(tables.find(t => t.id === activeWaitressTableId), item)}
                             <div>${badges}${itemKitchenBadgesHtml(tables.find(t => t.id === activeWaitressTableId), item)}</div>
                         </div>
                     </div>
@@ -5547,7 +5556,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     ? `<div class="space-y-1.5 max-h-32 overflow-y-auto pr-1">${table.items.map(item => `
                         <div class="flex items-start gap-2 bg-slate-950/70 border border-slate-800/80 rounded-xl px-2.5 py-1.5">
                             ${dishImgHtml(item, 'w-9 h-9 rounded-lg')}<span class="shrink-0 min-w-[1.6rem] text-center rounded-md bg-slate-800 text-amber-300 text-[11px] font-black py-0.5">${item.qty}×</span>
-                            <div class="min-w-0 flex-1"><p class="text-[11px] font-bold text-slate-100 leading-tight">${item.name}</p>${item.notes ? `<p class="text-[10px] text-amber-300/90 italic">${item.notes}</p>` : ''}</div>
+                            <div class="min-w-0 flex-1"><p class="text-[11px] font-bold text-slate-100 leading-tight">${item.name}</p>${itemNotesHtml(table, item)}<div>${itemKitchenBadgesHtml(table, item)}</div></div>
                             <span class="font-mono text-[11px] font-bold text-emerald-400 shrink-0">$${(item.price * item.qty).toFixed(0)}</span>
                         </div>`).join('')}</div>`
                     : `<div class="rounded-xl border border-dashed border-slate-700/70 py-4 text-center text-[11px] text-slate-500">Sin platillos en la orden</div>`;
@@ -5567,6 +5576,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     <p class="text-center text-[11px] text-slate-400 mt-1.5"><i class="fa-solid fa-users mr-1 text-slate-500"></i>${table.guests} personas${elapsed ? ` · ${_ti.chip}` : ''}${table.pin ? ` · <span class="font-mono font-black text-sky-300 tracking-widest">#${table.pin}</span>` : ''}</p>
                     <div class="mt-3 space-y-2 flex-1">
                         ${rows}
+                        ${waiterKitchenStripHtml(table)}
                         ${callAttendHtml}
                         ${transferAdminHtml}
                     </div>
@@ -6868,6 +6878,37 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
         }
 
+        function customerMenuCardHtml(prod) {
+            const available = isItemAvailable(prod);
+            return `
+                    <div class="bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden ${available ? '' : 'opacity-70'}">
+                        <div class="relative cursor-zoom-in" onclick="dishZoomSku('${prod.sku}')">
+                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="w-full h-28 object-cover ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
+                            <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
+                            <span class="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold ${available ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white'}">${available ? 'Disponible' : 'Agotado'}</span>
+                        </div>
+                        <div class="p-2.5 space-y-0.5">
+                            <p class="text-xs font-bold text-white leading-tight">${escapeHtmlText(prod.name)}</p>
+                            ${prod.desc ? `<p class="text-[10px] text-slate-400 leading-snug line-clamp-2">${escapeHtmlText(prod.desc)}</p>` : ''}
+                            <p class="text-sm font-black text-emerald-400">$${prod.price.toFixed(2)}</p>
+                        </div>
+                    </div>`;
+        }
+        function customerMenuBodyHtml() {
+            const cats = MENU_CATEGORIES.filter(c => catalog.some(p => p.category === c.key));
+            const active = (customerCatFilter !== 'all' && cats.some(c => c.key === customerCatFilter)) ? customerCatFilter : 'all';
+            const chip = (key, label, count) => `<button type="button" onclick="setCustomerCat('${key}')" class="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${active === key ? 'bg-orange-500 text-slate-950 border-orange-400' : 'bg-slate-950 text-slate-300 border-slate-700'}">${label} <span class="opacity-70">${count}</span></button>`;
+            const chips = chip('all', 'Todos', catalog.length) + cats.map(c => chip(c.key, c.emoji + ' ' + c.label, catalog.filter(p => p.category === c.key).length)).join('');
+            const q = String(customerNumQ || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            let list = catalogByNumber();
+            if (q) list = /^\d+$/.test(q) ? list.filter(p => String(dishNum(p)) === q) : list.filter(p => (p.name + ' ' + (p.desc || '')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(q) !== -1);
+            else if (active !== 'all') list = list.filter(p => p.category === active);
+            return `<div class="sticky top-0 z-10 py-1.5 bg-slate-950/95 flex gap-1.5 overflow-x-auto">${chips}</div>
+                    <div class="grid grid-cols-2 gap-2.5 pt-1">${list.map(customerMenuCardHtml).join('') || '<p class="col-span-2 text-center text-slate-500 text-xs py-8">No encontramos ese platillo</p>'}</div>`;
+        }
+        function refreshCustomerMenuBody() { const b = document.getElementById('customer-menu-body'); if (b) b.innerHTML = customerMenuBodyHtml(); }
+        function setCustomerCat(key) { customerCatFilter = key; customerNumQ = ''; const i = document.getElementById('customer-num-input'); if (i) i.value = ''; refreshCustomerMenuBody(); }
+        function setCustomerNumQ(v) { customerNumQ = v; refreshCustomerMenuBody(); }
         function renderCustomerView() {
             const table = getCustomerTable();
             const container = document.getElementById('customer-mobile-content');
@@ -6902,6 +6943,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                                 <div>
                                     <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${item.name}</h5>
                                     <p class="text-[10px] text-slate-400">$${item.price.toFixed(2)} x ${item.qty} u.</p>
+                                    ${itemNotesHtml(table, item)}
                                     ${getPendingQty(item) > 0 ? `<p class="text-[10px] text-amber-300 font-semibold">⏳ ${getPendingQty(item)} por confirmar</p>` : ''}
                                     ${itemKitchenBadgesHtml(table, item)}
                                 </div>
@@ -6976,7 +7018,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
             syncCustomerPopups(table, transferCustomerHtml);
 
-            const menuOpen = document.getElementById('customer-menu-details')?.open ? 'open' : '';
+            const menuOpen = customerMenuOpen === null ? (table.items.length === 0 ? 'open' : '') : (customerMenuOpen ? 'open' : '');
+            const numHadFocus = document.activeElement && document.activeElement.id === 'customer-num-input';
             const phoneEl = document.getElementById('customer-phone-input');
             const phoneHadFocus = !!phoneEl && document.activeElement === phoneEl;
             container.innerHTML = `
@@ -7019,14 +7062,17 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     `}
                 </div>
 
-                <details id="customer-menu-details" class="pt-1" ${menuOpen}>
-                    <summary class="cursor-pointer text-[11px] font-bold text-slate-400 uppercase tracking-wider py-2">Menú de hoy (toca para ver)</summary>
-                    <div class="grid grid-cols-2 gap-2.5 pt-1">
-                        ${menuStatusHtml}
+                <details id="customer-menu-details" class="pt-1" ${menuOpen} ontoggle="customerMenuOpen = this.open">
+                    <summary class="cursor-pointer text-[11px] font-bold text-slate-400 uppercase tracking-wider py-2">🍽️ Menú · elige por categoría o escribe el número</summary>
+                    <div class="flex gap-2 items-center bg-slate-900 border border-amber-500/40 rounded-2xl p-2">
+                        <span class="px-2 py-1 rounded-lg bg-amber-500 text-slate-950 text-sm font-black">Nº</span>
+                        <input id="customer-num-input" type="search" inputmode="search" autocomplete="off" value="${escapeHtmlText(customerNumQ)}" oninput="setCustomerNumQ(this.value)" placeholder="Número o nombre (ej. 10, cerveza)" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500">
                     </div>
+                    <div id="customer-menu-body">${customerMenuBodyHtml()}</div>
                 </details>
             `;
 
+            if (numHadFocus) { const ne = document.getElementById('customer-num-input'); if (ne) { ne.focus(); try { ne.setSelectionRange(ne.value.length, ne.value.length); } catch (e) {} } }
             if (phoneHadFocus) {
                 const pe = document.getElementById('customer-phone-input');
                 if (pe) {
@@ -7102,12 +7148,16 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
             // Platillos que se agregaron desde la última vez que se vio la mesa
             const snap = {};
-            table.items.forEach(i => { const k = i.sku || i.name; snap[k] = { name: i.name, qty: i.qty }; });
+            table.items.forEach(i => { const k = i.sku || i.name; snap[k] = { name: i.name, qty: Math.min(i.qty, i.confirmedQty || 0) }; });
             if (customerPrevTableId === table.id && customerPrevItems) {
                 const added = [];
                 Object.keys(snap).forEach(k => {
                     const before = customerPrevItems[k] ? customerPrevItems[k].qty : 0;
-                    if (snap[k].qty > before) added.push(`${snap[k].qty - before} × ${snap[k].name}`);
+                    if (snap[k].qty > before) {
+                        const _it = table.items.find(x => (x.sku || x.name) === k);
+                        const _np = _it ? itemNoteParts(table, _it).filter(x => !x.pending).slice(-1) : [];
+                        added.push(`${snap[k].qty - before} × ${snap[k].name}${_np.length ? ' (' + _np[0].text + ')' : ''}`);
+                    }
                 });
                 if (added.length) {
                     const ab = document.getElementById('customer-added-body');
@@ -7498,7 +7548,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             } catch (e) {}
         };
         var MENU = null, MENUCFG = {};
-        var ST = { nuevo: 'Recibido', cocina: 'En cocina', cocinado: 'Cocina terminó · falta avisar', preparando: 'En cocina', listo: '¡Listo para recoger!', entregado: 'Entregado', archivado: 'Entregado', cancelado: 'Cancelado' };
+        var ST = { nuevo: 'Enviado', cocina: 'Recibido', cocinado: 'Preparando', preparando: 'Preparando', listo: '¡Listo para recoger!', entregado: 'Entregado', archivado: 'Entregado', cancelado: 'Cancelado' };
 
         /* ---------- CLIENTE ---------- */
         if (CUST) {
@@ -7625,12 +7675,31 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
  .lv-side .lv-send{padding:10px;font-size:14px}
  .lv-side .lv-step button{width:26px;height:26px;border-radius:50%;font-size:13px;box-shadow:none}
  .lv-imgbox{--s:118px}
-}`;
+}
+.lv-grid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(165px,1fr))!important;gap:12px!important;padding:14px!important}
+.lv-card,.lv-card:last-child,.lv-card:nth-child(odd):nth-last-child(2){flex-direction:column!important;gap:0!important;padding:0!important;border:1px solid #1e4a78!important;border-radius:16px!important;background:#06182a!important;overflow:hidden;position:relative}
+.lv-card .lv-imgbox{order:-1;width:100%!important;height:125px!important;--s:100%;border:0;border-radius:0;position:relative}
+.lv-card .lv-text{padding:10px}
+.lv-line1{flex-direction:column;align-items:flex-start;gap:2px}
+.lv-dots{display:none}
+.lv-name{font-size:14px}
+.lv-price{font-size:17px;color:#34d399}
+.lv-desc{font-size:12px;margin:4px 0 8px}
+.lv-card .lv-act .lv-add{width:100%;height:40px;border-radius:12px;background:#f97316;border:0;box-shadow:none;font-size:13px;color:#111}
+.lv-card .lv-act .lv-add[disabled]{background:#264a68;color:#a5c8e3}
+.lv-card .lv-step{justify-content:space-between;background:#0b2238;border:1px solid rgba(249,115,22,.5);border-radius:12px;overflow:hidden}
+.lv-card .lv-step button{border-radius:0;border:0;box-shadow:none;background:transparent;color:#fb923c;width:44px}
+.lv-num-abs{position:absolute;top:6px;left:6px;z-index:2;margin:0}
+.lv-chip.on{background:#f97316;color:#111;border-color:#f97316}
+.lv-numrow{display:flex;gap:8px;align-items:center;margin:0 0 6px;padding:8px;border-radius:16px;border:1px solid rgba(245,158,11,.5);background:#06182a}
+.lv-numrow .nb{padding:6px 10px;border-radius:10px;background:#f59e0b;color:#0f172a;font-weight:900}
+.lv-numrow input{flex:1;min-width:0;padding:11px;border-radius:12px;border:1px solid #1e4a78;background:#0b2238;color:#fff;font-size:14px;font-weight:600;outline:none}
+.lv-numrow button{padding:11px 14px;border-radius:12px;background:#f59e0b;color:#111;font-weight:900;font-size:12px}`;
             document.head.appendChild(css);
 
             var BASE = 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_CONFIG.projectId + '/databases/(default)/documents';
             var KEY = FIREBASE_CONFIG.apiKey;
-            var cart = {}, form = {}, menuScroll = 0, view = 'loading', poll = null;
+            var cart = {}, form = {}, menuScroll = 0, view = 'loading', poll = null, llvCatSel = 'all';
             var root = document.getElementById('llevar-root');
             var mq = window.matchMedia('(min-width:1024px)');
             function desk() { return mq.matches; }
@@ -7684,7 +7753,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                         var ok = !q || (isNum ? c.getAttribute('data-n') === q : (c.getAttribute('data-q') || '').indexOf(q) !== -1);
                         c.style.display = ok ? '' : 'none'; if (ok) any++;
                     });
-                    sec.style.display = any ? '' : 'none'; shown += any;
+                    var catOk = (llvCatSel === 'all' || sec.id === 'cat-' + llvCatSel); sec.style.display = (any && catOk) ? '' : 'none'; if (catOk) shown += any;
                 });
                 var n = document.getElementById('llv-nores'); if (n) n.style.display = (q && !shown) ? 'block' : 'none';
             };
@@ -7708,7 +7777,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             function ctl(sku) {
                 var q = cart[sku] || 0, p = MENU.find(function (x) { return x.sku === sku; });
                 if (p && p.available === false) return '<button class="lv-add" disabled>Agotado</button>';
-                return q ? stepper(sku, q) : `<button class="lv-add" aria-label="Agregar" onclick="llvQty('${sku}',1)">+</button>`;
+                return q ? stepper(sku, q) : `<button class="lv-add" aria-label="Agregar" onclick="llvQty('${sku}',1)">＋ AGREGAR</button>`;
             }
             function barInner() {
                 var n = cartCount();
@@ -7753,6 +7822,24 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 z.innerHTML = '<button class="lv-zoom-x" onclick="document.getElementById(\'lv-zoom\').remove()" aria-label="Cerrar">✕</button><div class="lv-zoom-in"><img alt="' + esc(p.name) + '" src="' + esc(p.image || menuIcon(p.category)) + '" onerror="this.onerror=null;this.src=menuIcon(\'' + p.category + '\')"><div class="lv-zoom-b"><h3>' + numBadge(sku) + esc(p.name) + '</h3>' + (p.desc ? '<p>' + esc(p.desc) + '</p>' : '') + '<div class="lv-zoom-r"><span class="pr">' + $m(p.price) + '</span>' + add + '</div></div></div>';
                 document.body.appendChild(z);
             };
+            window.llvCat = function (k) {
+                llvCatSel = k;
+                document.querySelectorAll('.lv-chip').forEach(function (c) { c.classList.toggle('on', c.getAttribute('data-k') === k); });
+                var qi = document.getElementById('llv-q'); window.llvSearch(qi ? qi.value : '');
+                root.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+            window.llvAddNum = function () {
+                var i = document.getElementById('llv-numadd'), msg = document.getElementById('llv-numadd-msg'); if (!i) return;
+                var m = String(i.value || '').trim().match(/^(?:(\d+)\s*[*xX×]\s*)?(\d+)$/);
+                var say = function (t, ok) { if (msg) { msg.textContent = t; msg.style.color = ok ? '#34d399' : '#fb7185'; } };
+                if (!m) { say('Escribe el número del platillo (ej. 10). Para varios: 2*10', false); return; }
+                var qty = m[1] ? Math.min(30, Number(m[1])) : 1, num = Number(m[2]), map = numMap();
+                var sku = Object.keys(map).find(function (k) { return map[k] === num; });
+                if (!sku) { say('No existe el platillo ' + num, false); return; }
+                var pr = MENU.find(function (x) { return x.sku === sku; });
+                if (pr && pr.available === false) { say(pr.name + ' está agotado', false); return; }
+                window.llvQty(sku, qty); i.value = ''; say('✓ ' + qty + ' × ' + (pr ? pr.name : '') + ' agregado', true);
+            };
             window.llvGo = function (k) { var e = document.getElementById('cat-' + k); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
             window.llvCheckout = function () { menuScroll = root.scrollTop; view = 'checkout'; renderCheckout(); root.scrollTop = 0; };
             window.llvBack = function () { saveForm(); view = 'menu'; renderMenu(); root.scrollTop = menuScroll; };
@@ -7779,18 +7866,20 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 var avail = MENU.slice(), cats = MENU_CATEGORIES.slice();
                 avail.forEach(function (p) { if (!cats.some(function (c) { return c.key === p.category; })) cats.push({ key: p.category, label: p.category, emoji: '🍽️' }); });
                 cats = cats.filter(function (c) { return avail.some(function (p) { return p.category === c.key; }); });
-                var chips = cats.map(function (c) { return `<a class="lv-chip" onclick="llvGo('${c.key}')">${c.emoji} ${esc(c.label)} <span class="lv-chipn">${avail.filter(function (p) { return p.category === c.key; }).length}</span></a>`; }).join('');
+                var chips = `<a class="lv-chip${llvCatSel === 'all' ? ' on' : ''}" data-k="all" onclick="llvCat('all')">Todos <span class="lv-chipn">${avail.length}</span></a>` + cats.map(function (c) { return `<a class="lv-chip${llvCatSel === c.key ? ' on' : ''}" data-k="${c.key}" onclick="llvCat('${c.key}')">${c.emoji} ${esc(c.label)} <span class="lv-chipn">${avail.filter(function (p) { return p.category === c.key; }).length}</span></a>`; }).join('');
                 var body = cats.map(function (c) {
                     var list = avail.filter(function (p) { return p.category === c.key; });
                     return `<section id="cat-${c.key}" class="lv-sec"><div class="lv-cat"><div class="lv-cat-head"><h2>${esc(c.label)}</h2><span class="lv-count">${list.length} ${list.length === 1 ? 'opción' : 'opciones'}</span></div><div class="lv-grid">` + list.map(function (p) {
-                        return `<div class="lv-card${p.available === false ? ' off' : ''}" data-n="${numMap()[p.sku] || ''}" data-q="${esc(norm(p.name + ' ' + (p.desc || '')))}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${numBadge(p.sku)}${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox" onclick="llvZoom('${p.sku}')"><img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
+                        return `<div class="lv-card${p.available === false ? ' off' : ''}" data-n="${numMap()[p.sku] || ''}" data-q="${esc(norm(p.name + ' ' + (p.desc || '')))}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox" onclick="llvZoom('${p.sku}')">${numBadge(p.sku).replace('class="lv-num"', 'class="lv-num lv-num-abs"')}<img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
                     }).join('') + '</div></div></section>';
                 }).join('');
                 var consulta = '<div style="margin:0 0 14px;padding:12px;border-radius:14px;background:#0f172a;border:1px solid #1e293b"><div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:6px">🔎 ¿Ya hiciste un pedido hoy? Consulta cómo va</div><div style="display:flex;gap:8px"><input id="llv-code" class="lv-in" maxlength="4" autocapitalize="characters" placeholder="Tu código (4 letras)" style="margin:0;flex:1;text-transform:uppercase"><button onclick="llvFind()" style="padding:0 16px;border-radius:12px;background:#0284c7;color:#fff;font-weight:800">Ver</button></div><p id="llv-find-err" style="color:#fb7185;font-size:12px;min-height:14px;margin:6px 0 0"></p></div>';
                 var search = '<div class="lv-search"><span class="si">🔍</span><input id="llv-q" type="search" inputmode="search" autocomplete="off" placeholder="Buscar platillo o número (ej. 12, camarón)" oninput="llvSearch(this.value)"><button id="llv-sx" class="sx" onclick="llvSearchClear()" aria-label="Borrar">✕</button></div>';
-                var main = '<div class="lv-main">' + search + '<div id="llv-nores" class="lv-nores">No encontramos ese platillo 🦐<br><small>Prueba con otra palabra o número</small></div>' + consulta + body + '</div>';
+                var numadd = '<div class="lv-numrow"><span class="nb">Nº</span><input id="llv-numadd" inputmode="numeric" autocomplete="off" placeholder="Número del platillo (ej. 10)" onkeydown="if(event.key===\'Enter\')llvAddNum()"><button onclick="llvAddNum()">AGREGAR</button></div><p id="llv-numadd-msg" style="font-size:12px;color:#94a3b8;margin:0 0 12px">Escribe el número y pulsa Enter. Para varios: 2*10 (dos del número 10).</p>';
+                var main = '<div class="lv-main">' + numadd + search + '<div id="llv-nores" class="lv-nores">No encontramos ese platillo 🦐<br><small>Prueba con otra palabra o número</small></div>' + consulta + body + '</div>';
                 var layout = main;
                 root.innerHTML = shell(layout, chips, true) + `<div id="llv-bar" class="lv-bar">${barInner()}</div>`;
+                if (llvCatSel !== 'all') window.llvSearch('');
             }
             function renderCheckout() {
                 var it = items();
@@ -7864,22 +7953,24 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 var n = 0, iv = setInterval(function () { document.title = (n++ % 2 ? titleOrig : '✅ ¡Pedido listo!'); if (n > 30 || document.title === titleOrig && !document.hidden && n > 6) { clearInterval(iv); document.title = titleOrig; } }, 1000);
             }
             function drawTrack(o) {
-                var st = o.status, fin = st === 'entregado' || st === 'cancelado' || st === 'archivado', idx = { nuevo: 0, preparando: 1, cocina: 1, cocinado: 1, listo: 2, entregado: 2, archivado: 2 }[st];
+                var st = o.status, fin = st === 'entregado' || st === 'cancelado' || st === 'archivado', idx = { nuevo: 0, cocina: 1, preparando: 2, cocinado: 2, listo: 3, entregado: 3, archivado: 3 }[st];
                 window._lvLastO = o;
                 if (lastSt && lastSt !== st) {
-                    if ((st === 'cocina' || st === 'preparando') && lastSt === 'nuevo') { chime('soft'); llvPop('👨‍🍳 ¡Estamos preparando tu pedido!', 'Ya está en cocina. Te avisamos cuando esté listo.', '#d97706'); }
+                    if (st === 'cocina' && lastSt === 'nuevo') { chime('soft'); llvPop('🧾 ¡Recibimos tu pedido!', 'El restaurante ya lo aceptó. Te avisamos cuando empiecen a prepararlo.', '#0284c7'); }
+                    else if (st === 'preparando') { chime('soft'); llvPop('👨‍🍳 ¡Estamos preparando tu pedido!', 'Ya lo están cocinando. Te avisamos cuando esté listo.', '#d97706'); }
                     else if (st === 'cocinado') { chime('soft'); llvPop('🍽️ ¡Tu comida ya está lista!', 'En un momento te avisamos para que pases por ella.', '#db2777'); }
                     else if (st === 'cancelado') { llvPop('Pedido cancelado', 'Si tienes dudas llámanos al 744 294 0816.', '#7f1d1d'); }
                 }
                 if (st === 'listo' && lastSt && lastSt !== 'listo') { alertReady(); notifyReady(o); }
                 lastSt = st;
-                var steps = [['🧾', 'Recibido'], ['👨‍🍳', 'Preparando'], ['🛍️', 'Listo']];
+                var steps = [['📨', 'Enviado'], ['🧾', 'Recibido'], ['👨‍🍳', 'Preparando'], ['🛍️', 'Listo']];
                 var bar = steps.map(function (x, i) {
                     var on = idx !== undefined && i <= idx, cur = i === idx;
                     return '<div style="flex:1;text-align:center"><div style="width:46px;height:46px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;background:' + (on ? (st === 'listo' || st === 'entregado' ? '#059669' : '#0284c7') : '#1e293b') + ';' + (cur && !fin ? 'box-shadow:0 0 0 5px rgba(56,189,248,.25)' : '') + '">' + x[0] + '</div><div style="font-size:12px;margin-top:6px;font-weight:' + (cur ? 800 : 500) + ';color:' + (on ? '#e2e8f0' : '#64748b') + '">' + x[1] + '</div></div>';
                 }).join('<div style="flex:0 0 18px;height:3px;margin-top:22px;background:#334155"></div>');
-                var msg = st === 'nuevo' ? 'Recibimos tu pedido. En un momento lo empezamos a preparar.'
-                    : (st === 'preparando' || st === 'cocina') ? 'Tu pedido ya está en cocina. Te avisamos aquí en cuanto esté listo.'
+                var msg = st === 'nuevo' ? 'Enviamos tu pedido. En cuanto el restaurante lo acepte aparecerá como Recibido.'
+                    : st === 'cocina' ? '¡Tu pedido fue recibido! Está en la fila de cocina; aquí te avisamos cuando empiecen a prepararlo.'
+                    : st === 'preparando' ? 'Tu pedido se está preparando en cocina. Te avisamos aquí en cuanto esté listo.'
                     : st === 'cocinado' ? '¡Tu comida ya está lista en cocina! En un momento te avisamos para que pases por ella.'
                     : st === 'listo' ? '¡Tu pedido ya está listo! Puedes pasar a recogerlo. Muestra tu código <b>' + esc(o.code) + '</b>.'
                     : (st === 'entregado' || st === 'archivado') ? 'Pedido entregado. ¡Gracias, buen provecho!'
@@ -8069,7 +8160,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         }, 20000);
         window.llvKitchenOrders = function () {
             var q = (typeof storeConfig !== 'undefined' && storeConfig.webSeq) || {};
-            return orders.filter(function (o) { return (o.status === 'cocina' || o.status === 'preparando') && q[o._id]; }).map(function (o) { return { id: o._id, name: o.name, n: q[o._id], at: o.acceptedAt || o.createdAt }; });
+            return orders.filter(function (o) { return (o.status === 'cocina' || o.status === 'preparando') && q[o._id]; }).map(function (o) { return { id: o._id, name: o.name, n: q[o._id], at: o.acceptedAt || o.createdAt, status: o.status }; });
         };
         function seqTag(o) { var q = (typeof storeConfig !== 'undefined' && storeConfig.webSeq || {})[o._id]; return q ? '<span style="color:#fbbf24">' + kitchenNumLabel(q) + ' · WEB</span> ' : ''; }
         window.llvArrived = function (id) { webArrivedSet(id); render(); showToast('Cliente marcado como llegado', 'success'); };
@@ -8095,7 +8186,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             var base = o.status === 'cocina' || o.status === 'preparando' ? 'acceptedAt' : o.status === 'cocinado' ? 'cookedAt' : o.status === 'listo' ? 'readyAt' : 'createdAt';
             var m = mins(o, base), late = m >= 20 && o.status !== 'listo';
             var warn = m >= 10 && !late && o.status !== 'listo', tcol = late ? '#f87171' : warn ? '#fbbf24' : '#34d399', edge = late ? '#ef4444' : col;
-            var stl = { nuevo: '🆕 NUEVO', cocina: '🔥 EN COCINA', preparando: '🔥 EN COCINA', cocinado: '🍽️ COCINA TERMINÓ', listo: '✅ LISTO PARA RECOGER' }[o.status] || esc(o.status);
+            var stl = { nuevo: '🆕 NUEVO', cocina: '📥 ACEPTADO · EN FILA', preparando: '🔥 PREPARANDO', cocinado: '🍽️ COCINA TERMINÓ', listo: '✅ LISTO PARA RECOGER' }[o.status] || esc(o.status);
             return '<div style="border:1px solid ' + edge + ';border-left:6px solid ' + edge + ';border-radius:14px;padding:14px;background:#0f172a;' + (late ? 'box-shadow:0 8px 24px -12px #ef4444;' : '') + '">' +
                 (late ? '<div style="margin:-4px -4px 10px;padding:6px 10px;border-radius:8px;background:#7f1d1d;color:#fecaca;font-size:12px;font-weight:800">⚠️ Lleva ' + m + ' min en este paso</div>' : '') +
                 '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span style="padding:4px 10px;border-radius:9999px;background:' + col + '22;color:' + col + ';border:1px solid ' + col + '66;font-size:11px;font-weight:900;letter-spacing:.04em">' + stl + '</span><span style="padding:4px 10px;border-radius:9999px;background:' + tcol + '22;color:' + tcol + ';font-size:13px;font-weight:900">⏱ ' + m + ' min</span></div>' +
@@ -8146,7 +8237,13 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             try { playUiSound('confirm'); } catch (e) {}
             try { renderKitchenView(); } catch (e) {}
         };
-        window.llvKitchenDone = function (id) { var o = orders.find(function (x) { return x._id === id; }); if (!o) return; window.llvSet(id, 'cocinado'); try { playUiSound('confirm'); } catch (e) {} };
+        window.llvStart = function (id) {
+            var o = orders.find(function (x) { return x._id === id; }); if (!o || o.status !== 'cocina') return;
+            var bl = (typeof window.kitchenWebBlocker === 'function') ? window.kitchenWebBlocker(id) : null;
+            if (bl) { showToast('Primero termina ' + kitchenNumLabel(bl.k.n) + ' · ' + bl.t.name, 'warning'); return; }
+            upd(id, { status: 'preparando' }); try { playUiSound('tick'); } catch (e) {}
+        };
+        window.llvKitchenDone = function (id) { var o = orders.find(function (x) { return x._id === id; }); if (!o || o.status !== 'preparando') return; window.llvSet(id, 'cocinado'); try { playUiSound('confirm'); } catch (e) {} };
         var _rk = window.renderKitchenView;
         if (typeof _rk === 'function') window.renderKitchenView = function () {
             _rk.apply(this, arguments);
@@ -8159,7 +8256,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 var mn = mins(o, 'acceptedAt');
                 var bl = (typeof window.kitchenWebBlocker === 'function') ? window.kitchenWebBlocker(o._id) : null;
                 var tk = ticksGet(o._id), falta = (o.items || []).filter(function (_, ix) { return tk.indexOf(ix) < 0; }).length;
-                return '<div style="border:2px solid #38bdf8;border-radius:16px;padding:12px;background:#0f172a"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:26px;color:#fbbf24">' + seqTag(o) + '#' + esc(o.code) + '</b><span style="font-size:12px;color:#94a3b8">' + esc(o.name) + ' · ' + mn + ' min</span></div><ul style="margin:8px 0;list-style:none;padding:0">' + o.items.map(function (i, ix) { var on = tk.indexOf(ix) >= 0; return '<li ' + (bl ? '' : 'onclick="llvTick(\'' + o._id + '\',' + ix + ')"') + ' style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b;font-size:16px;font-weight:800;color:' + (on ? '#64748b' : '#fff') + ';cursor:pointer;' + (on ? 'text-decoration:line-through;' : '') + '"><span style="flex:0 0 26px;height:26px;border-radius:8px;border:2px solid ' + (on ? '#10b981' : '#64748b') + ';background:' + (on ? '#10b981' : 'transparent') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px">' + (on ? '✓' : '') + '</span><span>' + i.qty + '× ' + esc(i.name) + (i.note ? '<span style="display:inline-block;margin-left:6px;padding:1px 8px;border-radius:8px;background:#fbbf24;color:#0f172a;font-size:12px;font-weight:900;text-decoration:none">📝 ' + esc(i.note) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' + (o.notes ? '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px">Nota: ' + esc(o.notes) + '</div>' : '') + (bl ? '<div style="text-align:center;padding:10px;border-radius:12px;background:#422006;color:#fcd34d;font-weight:900;font-size:13px">⏳ En espera · primero termina ' + kitchenNumLabel(bl.k.n) + ' (' + esc(bl.t.name) + ')</div>' : falta ? '<button disabled style="width:100%;padding:12px;border-radius:12px;background:#334155;color:#94a3b8;font-weight:900;font-size:14px">Faltan ' + falta + ' por marcar</button>' : '<button onclick="llvKitchenDone(\'' + o._id + '\')" style="width:100%;padding:12px;border-radius:12px;background:#059669;color:#fff;font-weight:900;font-size:14px">✅ ¡LISTO!</button>') + '</div>';
+                return '<div style="border:2px solid #38bdf8;border-radius:16px;padding:12px;background:#0f172a"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:26px;color:#fbbf24">' + seqTag(o) + '#' + esc(o.code) + '</b><span style="font-size:12px;color:#94a3b8">' + esc(o.name) + ' · ' + mn + ' min</span></div><ul style="margin:8px 0;list-style:none;padding:0">' + o.items.map(function (i, ix) { var on = tk.indexOf(ix) >= 0; return '<li ' + ((bl || o.status !== 'preparando') ? '' : 'onclick="llvTick(\'' + o._id + '\',' + ix + ')"') + ' style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b;font-size:16px;font-weight:800;color:' + (on ? '#64748b' : '#fff') + ';cursor:pointer;' + (on ? 'text-decoration:line-through;' : '') + '"><span style="flex:0 0 26px;height:26px;border-radius:8px;border:2px solid ' + (on ? '#10b981' : '#64748b') + ';background:' + (on ? '#10b981' : 'transparent') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px">' + (on ? '✓' : '') + '</span><span>' + i.qty + '× ' + esc(i.name) + (i.note ? '<span style="display:inline-block;margin-left:6px;padding:1px 8px;border-radius:8px;background:#fbbf24;color:#0f172a;font-size:12px;font-weight:900;text-decoration:none">📝 ' + esc(i.note) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' + (o.notes ? '<div style="font-size:12px;color:#fbbf24;margin-bottom:6px">Nota: ' + esc(o.notes) + '</div>' : '') + (bl ? '<div style="text-align:center;padding:10px;border-radius:12px;background:#422006;color:#fcd34d;font-weight:900;font-size:13px">⏳ En espera · primero termina ' + kitchenNumLabel(bl.k.n) + ' (' + esc(bl.t.name) + ')</div>' : o.status !== 'preparando' ? '<button onclick="llvStart(\'' + o._id + '\')" style="width:100%;padding:12px;border-radius:12px;background:#ea580c;color:#fff;font-weight:900;font-size:14px">🔥 EMPEZAR</button>' : falta ? '<button disabled style="width:100%;padding:12px;border-radius:12px;background:#334155;color:#94a3b8;font-weight:900;font-size:14px">Faltan ' + falta + ' por marcar</button>' : '<button onclick="llvKitchenDone(\'' + o._id + '\')" style="width:100%;padding:12px;border-radius:12px;background:#059669;color:#fff;font-weight:900;font-size:14px">✅ ¡LISTO!</button>') + '</div>';
             }).join('') + '</div>';
             board.insertBefore(d, board.firstChild);
         };
