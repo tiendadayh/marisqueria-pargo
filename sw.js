@@ -4,13 +4,14 @@
    - Las librerías externas (Tailwind, Font Awesome, Firebase, QR, PDF, fuentes) también se guardan,
      porque sin ellas la página abre sin estilos o sin funciones.
    - Los datos (Firestore) NO se guardan aquí: la propia app los guarda en el dispositivo. */
-const VERSION = 'gastropos-v2';
+const VERSION = 'gastropos-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './apple-touch-icon.png'];
 const LIBS = [
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&family=Archivo:wght@700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap'
@@ -49,7 +50,11 @@ self.addEventListener('fetch', (e) => {
     e.respondWith((async () => {
       const c = await caches.open(VERSION);
       try {
-        const net = await fetch(req);
+        // Si ya hay copia guardada y el internet no responde en 4.5 s (Wi-Fi sin internet), abre la guardada
+        const saved = await c.match('./index.html', { ignoreSearch: true });
+        const net = saved
+          ? await Promise.race([fetch(req), new Promise((_, rej) => setTimeout(() => rej(new Error('lento')), 4500))])
+          : await fetch(req);
         if (net && net.ok) c.put('./index.html', net.clone()).catch(() => {});
         return net;
       } catch (err) {

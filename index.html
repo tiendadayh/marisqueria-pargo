@@ -7680,9 +7680,12 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
             // Aviso de conexión y subida de cambios hechos sin internet
             var banner = document.getElementById('offline-banner');
+            var _flushing = false, _flushStart = 0;
             function flushOfflineChanges() {
                 if (window.__LLEVAR || localStorage.getItem('pargo_offline_dirty') !== '1') return;
                 if (typeof cloudDb === 'undefined' || !cloudDb || typeof FIRESTORE_ROOM_DOC === 'undefined') return;
+                if (_flushing && Date.now() - _flushStart < 30000) return; // ya hay una subida en curso
+                _flushing = true; _flushStart = Date.now();
                 var ref = cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC);
                 ref.get({ source: 'server' }).then(function (snap) { return snap; }, function () { return null; }).then(function (snap) {
                     try {
@@ -7696,9 +7699,14 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 }).then(function () {
                     localStorage.removeItem('pargo_offline_dirty');
                     updateCloudPill('Nube Activa', true);
+                    _flushing = false;
                     showToast('Cambios hechos sin internet ya se sincronizaron', 'success');
-                }).catch(function () {});
+                }).catch(function () { _flushing = false; });
             }
+            // Reintento automático: si la subida falló o la nube aún no estaba lista, se vuelve a intentar sola
+            setInterval(function () {
+                try { if (navigator.onLine !== false && localStorage.getItem('pargo_offline_dirty') === '1') flushOfflineChanges(); } catch (e) {}
+            }, 20000);
             function setOnlineUI() {
                 var on = navigator.onLine;
                 /* el aviso lo pinta el monitor de conexión */
@@ -8126,6 +8134,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             window.llvSend = async function () {
                 var err = document.getElementById('llv-err'), name = document.getElementById('llv-name').value.trim(), ph = document.getElementById('llv-phone').value.replace(/\D/g, ''), it = items();
                 if (!it.length) { err.textContent = 'Agrega al menos un platillo.'; return; }
+                if (it.length > 40) { err.textContent = 'Son demasiados platillos distintos (máximo 40). Llama al restaurante para pedidos grandes.'; return; }
+                if (cartTotal() >= 20000) { err.textContent = 'El pedido es muy grande para hacerlo en línea. Llama al restaurante.'; return; }
                 if (name.length < 2) { err.textContent = 'Escribe tu nombre.'; return; }
                 if (ph.length < 10) { err.textContent = 'Escribe tu WhatsApp a 10 dígitos.'; return; }
                 if (!navigator.onLine || (window.__net && !window.__net.online)) { err.textContent = 'Sin internet: no se pudo enviar. Revisa tu conexión.'; return; }
