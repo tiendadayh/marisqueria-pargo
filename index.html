@@ -2340,11 +2340,11 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (t) openTicketModalForTable(t.id);
         }
         function setTicketShareVisibility() {
-            const cust = currentRole === 'customer';
+            const cust = currentRole === 'customer', wait = currentRole === 'waitress';
             const sb = document.getElementById('ticket-share-block');
-            if (sb) sb.classList.toggle('hidden', cust);
+            if (sb) sb.classList.toggle('hidden', cust || wait);
             const dl = document.getElementById('btn-download-ticket-pdf');
-            if (dl) dl.classList.toggle('hidden', cust);
+            if (dl) dl.classList.toggle('hidden', wait || (cust && !(currentTicketData && currentTicketData.kind === 'venta')));
         }
 
         // --- WHATSAPP: normalizar y mostrar números ---
@@ -2434,11 +2434,12 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             let claim = '';
             try { claim = localStorage.getItem(key) || ''; } catch (e) {}
             if (table.status === 'free') {
-                if (claim && claim !== 'ended') { try { localStorage.setItem(key, 'ended'); } catch (e) {} claim = 'ended'; }
+                if (claim && claim !== 'ended') { try { localStorage.setItem(key + '_last', claim); localStorage.setItem(key, 'ended'); } catch (e) {} claim = 'ended'; }
                 return claim === 'ended' ? 'ended-free' : 'ok';
             }
             if (!table.sid) return 'ok';
             if (!claim) return table.pin ? 'needpin' : 'ok';
+            if (claim !== table.sid && claim !== 'ended') { try { localStorage.setItem(key + '_last', claim); } catch (e) {} }
             return claim === table.sid ? 'ok' : 'ended';
         }
         function customerPinGateHtml(table) {
@@ -2454,14 +2455,55 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     <p class="text-[10px] text-slate-500">Si vienen varios en la mesa, comparten el mismo código.</p>
                 </div>`;
         }
+        // --- TICKET PDF PARA EL CLIENTE DE MESA (QR): solo el suyo, y él decide si lo descarga ---
+        function customerLastSale(table) {
+            try {
+                if (!table) return null;
+                const last = localStorage.getItem(customerClaimKey(table) + '_last') || '';
+                if (!last) return null;
+                const lim = Date.now() - 24 * 3600 * 1000;
+                const list = salesHistory.filter(x => x.sid === last && x.closedAt && new Date(x.closedAt).getTime() > lim);
+                if (!list.length) return null;
+                list.sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt));
+                return list[0];
+            } catch (e) { return null; }
+        }
+        function customerTicketBlockHtml(table) {
+            const sale = customerLastSale(table);
+            if (!sale) return '';
+            return `<div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 space-y-2 text-center mb-3">
+                <p class="text-xs font-bold text-slate-200">🧾 ¿Quieres tu ticket en PDF?</p>
+                <button onclick="customerGetTicket('${sale.id}')" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2"><i class="fa-solid fa-file-arrow-down"></i> DESCARGAR MI TICKET PDF</button>
+            </div>`;
+        }
+        function customerGetTicket(folio) {
+            openTicketModalForSale(folio);
+            setTimeout(() => { try { downloadTicketPDF(); } catch (e) {} }, 450);
+        }
+        function askCustomerTicket(sale) {
+            try {
+                if (!sale || document.getElementById('cust-ask-tk')) return;
+                const k = 'pargo_tk_ask_' + sale.id;
+                try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch (e) {}
+                const d = document.createElement('div');
+                d.id = 'cust-ask-tk';
+                d.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,8,20,.78);display:flex;align-items:center;justify-content:center;padding:16px';
+                d.innerHTML = '<div style="width:100%;max-width:360px;background:#0f172a;border:1px solid #334155;border-radius:22px;padding:22px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.6)"><div style="font-size:40px">🧾</div><h3 style="margin:6px 0 4px;font-size:20px;font-weight:900">¡Pago recibido!</h3><p style="margin:0 0 16px;font-size:14px;color:#94a3b8">¿Quieres descargar tu ticket en PDF?</p><button id="cust-tk-yes" style="display:block;width:100%;padding:13px;border-radius:14px;background:#10b981;color:#052e1f;font-weight:900;font-size:15px;margin-bottom:8px;border:0">Sí, descargar PDF</button><button id="cust-tk-no" style="display:block;width:100%;padding:12px;border-radius:14px;background:#1e293b;color:#cbd5e1;font-weight:800;font-size:14px;border:0">No, gracias</button></div>';
+                document.body.appendChild(d);
+                document.getElementById('cust-tk-yes').onclick = function () { d.remove(); customerGetTicket(sale.id); };
+                document.getElementById('cust-tk-no').onclick = function () { d.remove(); };
+            } catch (e) {}
+        }
         function customerFarewellHtml(table) {
             const canJoin = table.status !== 'free';
-            return `<div id="customer-farewell" data-join="${canJoin ? 1 : 0}">
+            const _ls = customerLastSale(table);
+            return `<div id="customer-farewell" data-join="${canJoin ? 1 : 0}" data-tk="${_ls ? _ls.id : ''}">
                 <div class="py-10 px-4 text-center space-y-3">
                     <div class="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-3xl">🙏</div>
                     <h3 class="text-lg font-black text-white">¡Gracias por tu visita!</h3>
                     <p class="text-xs text-slate-400">Tu servicio en ${escapeHtmlText(table.name)} ya terminó. Esperamos verte pronto.</p>
                 </div>
+                ${customerTicketBlockHtml(table)}
                 ${canJoin ? `
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
                     <p class="text-xs font-bold text-slate-300">¿Quieres pedir algo más o llegó alguien nuevo a la mesa?</p>
@@ -3904,14 +3946,15 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
         // Al cerrar una venta (mesa o pedido para llevar): preguntar si quiere su ticket en PDF
         function askTicketPdf(folio) {
+            if (currentRole === 'waitress') return;
             try {
                 const old = document.getElementById('ask-ticket-pdf'); if (old) old.remove();
                 const d = document.createElement('div');
                 d.id = 'ask-ticket-pdf';
                 d.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(2,8,20,.75);display:flex;align-items:center;justify-content:center;padding:16px';
-                d.innerHTML = '<div style="width:100%;max-width:360px;background:#0f172a;border:1px solid #334155;border-radius:22px;padding:22px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.6)"><div style="font-size:40px">🧾</div><h3 style="margin:6px 0 4px;font-size:20px;font-weight:900">Venta cobrada</h3><p style="margin:0 0 16px;font-size:13px;color:#94a3b8">¿El cliente quiere su ticket en PDF?</p><button id="ask-ticket-yes" style="display:block;width:100%;padding:13px;border-radius:14px;background:#10b981;color:#052e1f;font-weight:900;font-size:15px;margin-bottom:8px">Sí, ver ticket / PDF</button><button id="ask-ticket-no" style="display:block;width:100%;padding:12px;border-radius:14px;background:#1e293b;color:#cbd5e1;font-weight:800;font-size:14px">No, gracias</button></div>';
+                d.innerHTML = '<div style="width:100%;max-width:360px;background:#0f172a;border:1px solid #334155;border-radius:22px;padding:22px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.6)"><div style="font-size:40px">🧾</div><h3 style="margin:6px 0 4px;font-size:20px;font-weight:900">Venta cobrada</h3><p style="margin:0 0 16px;font-size:13px;color:#94a3b8">¿El cliente quiere descargar su ticket en PDF?</p><button id="ask-ticket-yes" style="display:block;width:100%;padding:13px;border-radius:14px;background:#10b981;color:#052e1f;font-weight:900;font-size:15px;margin-bottom:8px">Sí, descargar PDF</button><button id="ask-ticket-no" style="display:block;width:100%;padding:12px;border-radius:14px;background:#1e293b;color:#cbd5e1;font-weight:800;font-size:14px">No, gracias</button></div>';
                 document.body.appendChild(d);
-                document.getElementById('ask-ticket-yes').onclick = function () { d.remove(); openTicketModalForSale(folio); };
+                document.getElementById('ask-ticket-yes').onclick = function () { d.remove(); openTicketModalForSale(folio); setTimeout(function () { try { downloadTicketPDF(); } catch (e) {} }, 450); };
                 document.getElementById('ask-ticket-no').onclick = function () { d.remove(); };
             } catch (e) {}
         }
@@ -3962,6 +4005,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         // Se prepara el PDF mientras la mesera revisa el ticket, para que al tocar "Enviar" salga al instante
         function scheduleTicketPdfPrefetch() {
             ticketPdfPromise = null;
+            if (currentRole === 'waitress' || currentRole === 'customer') return;
             setTimeout(() => {
                 const modal = document.getElementById('modal-ticket-receipt');
                 if (!modal || modal.classList.contains('hidden')) return;
@@ -3991,7 +4035,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
         async function sendTicketPdfWhatsApp() {
             if (!currentTicketData) return;
-            if (currentRole === 'customer') { showToast('Pide tu ticket a la mesera', 'info'); return; }
+            if (currentRole === 'customer' || currentRole === 'waitress') { showToast('Solo caja puede descargar o enviar el ticket', 'info'); return; }
             const btn = document.getElementById('btn-send-ticket-pdf');
             const d = currentTicketData;
             const phone = normalizePhone(document.getElementById('ticket-phone-input').value);
@@ -4042,7 +4086,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         }
 
         async function downloadTicketPDF() {
-            if (currentRole === 'customer') { showToast('Pide tu ticket a la mesera', 'info'); return; }
+            if (currentRole === 'waitress' || (currentRole === 'customer' && !(currentTicketData && currentTicketData.kind === 'venta'))) { showToast(currentRole === 'customer' ? 'Podrás descargar tu ticket cuando termines de pagar' : 'Solo caja puede descargar o enviar el ticket', 'info'); return; }
             const btn = document.getElementById('btn-download-ticket-pdf');
             const original = btn.innerHTML;
             btn.disabled = true;
@@ -5245,6 +5289,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 phone: salePhone,
                 proof: (selectedPaymentMethod === 'Transferencia' && table.transferProof && table.transferProof.image) ? table.transferProof.image : '',
                 partial: isPartial,
+                sid: table.sid || '',
                 openedAt: table.openedAt || '',
                 durationMin: (!isPartial && table.openedAt && isFinite(new Date(table.openedAt).getTime())) ? Math.max(1, Math.round((Date.now() - new Date(table.openedAt).getTime()) / 60000)) : null,
                 items: chargeItems.map(i => ({ sku: i.sku || '', name: i.name, price: i.price, qty: i.qty, notes: i.notes || '' })),
@@ -5298,7 +5343,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             } else {
                 showToast(`¡Venta ${folio} por $${total.toFixed(2)} cobrada por ${selectedPaymentMethod.toLowerCase()}! Mesa liberada.`, 'success');
             }
-            if (salePhone) openTicketModalForSale(folio); else askTicketPdf(folio);
+            askTicketPdf(folio);
         }
 
         // --- DIVIDIR CUENTA (cobro parcial por platillos) ---
@@ -6951,7 +6996,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
             { const _g = customerSessionGate(table);
               if (_g === 'needpin') { const _hasPin = document.getElementById('customer-join-pin'); if (!_hasPin) container.innerHTML = customerPinGateHtml(table); footer.innerHTML = ''; return; }
-              if (_g === 'ended' || _g === 'ended-free') { const _fw = document.getElementById('customer-farewell'); if (!_fw || _fw.getAttribute('data-join') !== (table.status !== 'free' ? '1' : '0')) container.innerHTML = customerFarewellHtml(table); footer.innerHTML = ''; return; } }
+              if (_g === 'ended' || _g === 'ended-free') { const _fw = document.getElementById('customer-farewell'); const _ls = customerLastSale(table); if (!_fw || _fw.getAttribute('data-join') !== (table.status !== 'free' ? '1' : '0') || _fw.getAttribute('data-tk') !== (_ls ? _ls.id : '')) container.innerHTML = customerFarewellHtml(table); if (_ls) askCustomerTicket(_ls); footer.innerHTML = ''; return; } }
 
             const total = table.items.reduce((s, i) => s + (i.price * i.qty), 0);
 
@@ -7965,6 +8010,61 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             };
 
             var lastSt = null, titleOrig = document.title;
+            // --- TICKET PDF PARA EL CLIENTE (pedido para llevar ya pagado) ---
+            window.llvAskTicket = function (o) {
+                try {
+                    if (!o || !o.code || document.getElementById('llv-ask-tk')) return;
+                    var k = 'pargo_tk_ask_' + o.code;
+                    try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1'); } catch (e) {}
+                    var d = document.createElement('div');
+                    d.id = 'llv-ask-tk';
+                    d.style.cssText = 'position:fixed;inset:0;z-index:100003;background:rgba(2,8,20,.78);display:flex;align-items:center;justify-content:center;padding:16px';
+                    d.innerHTML = '<div style="width:100%;max-width:360px;background:#0f172a;border:1px solid #334155;border-radius:22px;padding:22px;text-align:center;color:#fff;box-shadow:0 24px 60px rgba(0,0,0,.6)"><div style="font-size:40px">🧾</div><h3 style="margin:6px 0 4px;font-size:20px;font-weight:900">¡Pago recibido!</h3><p style="margin:0 0 16px;font-size:14px;color:#94a3b8">¿Quieres descargar tu ticket en PDF?</p><button id="llv-tk-yes" style="display:block;width:100%;padding:13px;border-radius:14px;background:#10b981;color:#052e1f;font-weight:900;font-size:15px;margin-bottom:8px;border:0">Sí, descargar PDF</button><button id="llv-tk-no" style="display:block;width:100%;padding:12px;border-radius:14px;background:#1e293b;color:#cbd5e1;font-weight:800;font-size:14px;border:0">No, gracias</button></div>';
+                    document.body.appendChild(d);
+                    document.getElementById('llv-tk-yes').onclick = function () { d.remove(); window.llvTicketPdf(); };
+                    document.getElementById('llv-tk-no').onclick = function () { d.remove(); };
+                } catch (e) {}
+            };
+            var llvTkBusy = false;
+            window.llvTicketPdf = async function () {
+                var o = window._lvLastO;
+                if (!o || llvTkBusy) return;
+                if (typeof html2pdf === 'undefined') { window.llvPop('No se pudo generar el PDF', 'Revisa tu conexión e intenta de nuevo.', '#7f1d1d'); return; }
+                llvTkBusy = true;
+                var box = null;
+                try {
+                    var biz = (MENUCFG && MENUCFG.businessName) || 'Marisquería PARGO';
+                    var lg = logo();
+                    var when = o.paidAt ? new Date(o.paidAt) : new Date();
+                    var rows = (o.items || []).map(function (i) {
+                        var pr = priceOf(i), q = Number(i.qty || 0);
+                        return '<tr><td style="padding:5px 0;vertical-align:top;border-bottom:1px dashed #e2e8f0"><b>' + q + '×</b> ' + esc(i.name) + (i.note ? '<div style="font-size:10px;color:#b45309;font-style:italic">' + esc(i.note) + '</div>' : '') + '</td><td style="padding:5px 0 5px 8px;text-align:right;white-space:nowrap;vertical-align:top;border-bottom:1px dashed #e2e8f0">' + $m(pr * q) + '</td></tr>';
+                    }).join('');
+                    box = document.createElement('div');
+                    box.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;width:320px;background:#ffffff;color:#0f172a;font-family:Segoe UI,Roboto,Arial,sans-serif;font-size:12px;padding:18px;box-sizing:border-box';
+                    box.innerHTML = '<div style="text-align:center;padding-bottom:10px;border-bottom:2px solid #0f172a">' + (lg ? '<img src="' + lg + '" style="height:56px;display:block;margin:0 auto 6px;border-radius:12px">' : '') + '<div style="font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:.5px">' + esc(biz) + '</div><div style="font-size:10px;letter-spacing:3px;color:#64748b;text-transform:uppercase;margin-top:3px">Ticket · Pedido para llevar</div></div>' +
+                        '<div style="padding:10px 0;font-size:11px;line-height:1.7;border-bottom:1px dashed #94a3b8"><div><b>Código:</b> ' + esc(o.code) + '</div><div><b>Cliente:</b> ' + esc(o.name) + '</div><div><b>Fecha:</b> ' + when.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + when.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) + '</div>' + (o.method ? '<div><b>Pago:</b> ' + esc(o.method) + '</div>' : '') + '</div>' +
+                        '<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px"><tbody>' + rows + '</tbody></table>' +
+                        '<div style="margin-top:10px;padding:10px 12px;background:#0f172a;color:#fff;border-radius:10px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Total pagado</span><span style="font-size:18px;font-weight:900;color:#fcd34d">' + $m(totalOf(o)) + ' MXN</span></div>' +
+                        '<div style="text-align:center;margin-top:12px;font-size:11px;color:#475569"><b>¡Gracias por tu compra!</b><br>Te esperamos pronto 🦐</div>';
+                    document.body.appendChild(box);
+                    var im = box.querySelector('img'); if (im) { try { await im.decode(); } catch (e) {} }
+                    var canvas = await html2pdf().set({ html2canvas: { scale: 2.5, useCORS: true, logging: false, backgroundColor: '#ffffff' } }).from(box).toCanvas().get('canvas');
+                    var pageW = 80, margin = 4;
+                    var pageH = Math.ceil(canvas.height / canvas.width * (pageW - margin * 2) + margin * 2) + 2;
+                    var fileName = 'Ticket_' + String(biz).replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + o.code + '.pdf';
+                    var blob = await html2pdf().set({ margin: [margin, margin, margin, margin], filename: fileName, image: { type: 'jpeg', quality: 0.95 }, jsPDF: { unit: 'mm', format: [pageW, pageH], orientation: 'portrait' } }).from(canvas, 'canvas').outputPdf('blob');
+                    var url = URL.createObjectURL(blob), a = document.createElement('a');
+                    a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
+                    window.llvPop('🧾 Ticket descargado', 'Busca el PDF en tus descargas.', '#059669');
+                } catch (e) {
+                    window.llvPop('No se pudo generar el PDF', 'Intenta de nuevo con el botón "Descargar ticket PDF".', '#7f1d1d');
+                } finally {
+                    if (box && box.parentNode) box.remove();
+                    llvTkBusy = false;
+                }
+            };
             window.llvNotif = function () {
                 try { Notification.requestPermission().then(function () { if (window._lvLastO) drawTrack(window._lvLastO); }); } catch (e) {}
             };
@@ -8012,14 +8112,15 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                     : st === 'listo' ? '¡Tu pedido ya está listo! Puedes pasar a recogerlo. Muestra tu código <b>' + esc(o.code) + '</b>.'
                     : (st === 'entregado' || st === 'archivado') ? 'Tu pedido <b>' + esc(o.code) + '</b> fue entregado. ¡Buen provecho!'
                     : 'Este pedido fue cancelado. Si tienes dudas llámanos al 744 294 0816.';
-                var done = (st === 'entregado' || st === 'archivado');
+                var done = (st === 'entregado' || st === 'archivado'); var paid = done && !!o.paidAt;
                 var banner = done ? '<div class="lv-thanks"><div class="lv-thanks-ic">✔</div><div class="lv-thanks-t">¡Gracias por tu compra!</div><div class="lv-thanks-s">Que disfrutes tu pedido 🦐 · Te esperamos pronto en Marisquería PARGO</div></div>' : st === 'listo' ? '<div style="margin:0 0 18px;padding:16px;border-radius:16px;background:#059669;color:#fff;font-size:22px;font-weight:800">✅ ¡Ya puedes pasar por tu pedido!</div>' : '';
                 var items = (o.items || []).map(function (i) { return '<li>' + i.qty + ' × ' + esc(i.name) + (i.note ? ' <i style="color:#fbbf24">(' + esc(i.note) + ')</i>' : '') + '</li>'; }).join('');
                 root.innerHTML = shell('<div class="lv-track">' + banner + '<div style="font-size:13px;color:#94a3b8">Tu código</div><div style="font-size:44px;font-weight:800;letter-spacing:4px;color:#fbbf24">' + esc(o.code) + '</div>' +
                     (st === 'cancelado' ? '' : '<div style="display:flex;align-items:flex-start;margin:20px 0">' + bar + '</div>') +
                     '<div style="color:#cbd5e1;font-size:15px;margin-bottom:14px">' + msg + '</div>' +
                     '<div style="text-align:left;background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:12px 14px;color:#94a3b8;font-size:13px"><div style="color:#e2e8f0;font-weight:700;margin-bottom:4px">' + esc(o.name) + '</div><ul style="margin:6px 0 8px 18px;list-style:disc">' + items + '</ul>Total a pagar al recoger: <b style="color:#fff">' + $m(totalOf(o)) + '</b></div>' +
-                    (fin ? '<button onclick="llvNew()" class="lv-again">🥡 Hacer otro pedido</button>' : (('Notification' in window && Notification.permission === 'default' && st !== 'listo') ? '<button onclick="llvNotif()" class="lv-add" style="margin-top:16px;padding:10px 18px">🔔 Avisarme cuando esté listo</button>' : '') + '<div style="margin-top:14px;font-size:12px;color:#64748b">Esta pantalla se actualiza sola. Puedes cerrarla y volver a abrir este mismo enlace en cualquier momento.</div>') + '</div>');
+                    (fin ? (paid ? '<button onclick="llvTicketPdf()" class="lv-again" style="background:linear-gradient(135deg,#059669,#10b981);margin-top:18px">🧾 Descargar ticket PDF</button>' : '') + '<button onclick="llvNew()" class="lv-again" style="margin-top:12px">🥡 Hacer otro pedido</button>' : (('Notification' in window && Notification.permission === 'default' && st !== 'listo') ? '<button onclick="llvNotif()" class="lv-add" style="margin-top:16px;padding:10px 18px">🔔 Avisarme cuando esté listo</button>' : '') + '<div style="margin-top:14px;font-size:12px;color:#64748b">Esta pantalla se actualiza sola. Puedes cerrarla y volver a abrir este mismo enlace en cualquier momento.</div>') + '</div>');
+                if (paid) { try { window.llvAskTicket(o); } catch (e) {} }
             }
             function track(id) {
                 view = 'track';
