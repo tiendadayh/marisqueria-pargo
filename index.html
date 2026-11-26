@@ -2693,6 +2693,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             renderKitchenView();
             checkKitchenChanges();
             if (currentRole === 'customer') renderCustomerView();
+            try { if (window.llvRender) window.llvRender(); } catch (e) {}
         }
 
         function renderPayingTablesBanner() {
@@ -4109,7 +4110,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             targetTable.items = JSON.parse(JSON.stringify(sourceTable.items));
             targetTable.kitchen = JSON.parse(JSON.stringify(sourceTable.kitchen || []));
             targetTable.kitchen.forEach(k => { k.tableName = targetTable.name; });
-            sourceTable.kitchen = [];
+            sourceTable.kitchen = []; sourceTable.orderRounds = 0;
 
             targetTable.calling = !!sourceTable.calling;
             sourceTable.calling = false;
@@ -4250,7 +4251,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (table) {
                 table.status = 'free';
                 table.items = [];
-                table.kitchen = [];
+                table.kitchen = []; table.orderRounds = 0;
                 table.guests = 0;
                 table.calling = false;
                 table.customerPhone = '';
@@ -5272,7 +5273,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             } else {
                 table.status = 'free';
                 table.items = [];
-                table.kitchen = [];
+                table.kitchen = []; table.orderRounds = 0;
                 table.guests = 0;
                 table.calling = false;
                 table.customerPhone = '';
@@ -8229,7 +8230,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><span style="padding:4px 10px;border-radius:9999px;background:' + col + '22;color:' + col + ';border:1px solid ' + col + '66;font-size:11px;font-weight:900;letter-spacing:.04em">' + stl + '</span><span style="padding:4px 10px;border-radius:9999px;background:' + tcol + '22;color:' + tcol + ';font-size:13px;font-weight:900">⏱ ' + m + ' min</span></div>' +
                 '<div style="margin-top:10px;font-size:20px;font-weight:900;color:#fff">' + seqTag(o) + '#' + esc(o.code) + ' · ' + esc(o.name) + '</div>' +
                 '<div style="font-size:12px;color:#94a3b8;margin-top:2px">📞 <a href="tel:' + esc(o.phone) + '" style="color:#7dd3fc">' + esc(o.phone) + '</a> · Pedido a las ' + hora(o.createdAt) + '</div>' +
-                '<div style="margin:10px 0;border-top:1px solid #1e293b">' + (o.items || []).map(function (i) { return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #1e293b"><span style="min-width:34px;text-align:center;padding:2px 0;border-radius:8px;background:#1e293b;color:#fbbf24;font-weight:900;font-size:14px">' + i.qty + '×</span><div style="flex:1;font-size:15px;font-weight:700;color:#f1f5f9">' + esc(i.name) + (i.note ? '<div style="font-size:12px;color:#fbbf24;font-weight:700">📝 ' + esc(i.note) + '</div>' : '') + '</div></div>'; }).join('') + '</div>' +
+                ((o.status === 'preparando' || o.status === 'cocina') ? (function () { var tk = ticksGet(o._id), tot = (o.items || []).length, dn = (o.items || []).filter(function (_, k) { return tk.indexOf(k) >= 0; }).length; return '<div style="margin-top:8px;font-size:12px;font-weight:800;color:' + (dn === tot && tot ? '#34d399' : '#fbbf24') + '">👨‍🍳 Cocina: ' + dn + ' de ' + tot + ' platillos listos</div>'; })() : '') +
+                '<div style="margin:10px 0;border-top:1px solid #1e293b">' + (o.items || []).map(function (i, ix) { var on = ticksGet(o._id).indexOf(ix) >= 0 && (o.status === 'preparando' || o.status === 'cocina' || o.status === 'cocinado'); return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #1e293b' + (on ? ';opacity:.75' : '') + '"><span style="min-width:34px;text-align:center;padding:2px 0;border-radius:8px;background:' + (on ? '#10b981' : '#1e293b') + ';color:' + (on ? '#fff' : '#fbbf24') + ';font-weight:900;font-size:14px">' + (on ? '✓ ' : '') + i.qty + '×</span><div style="flex:1;font-size:15px;font-weight:700;color:' + (on ? '#64748b' : '#f1f5f9') + ';' + (on ? 'text-decoration:line-through' : '') + '">' + esc(i.name) + (i.note ? '<div style="font-size:12px;color:#fbbf24;font-weight:700">📝 ' + esc(i.note) + '</div>' : '') + '</div></div>'; }).join('') + '</div>' +
                 (o.notes ? '<div style="font-size:12px;color:#fde68a;background:#422006;border-radius:8px;padding:6px 10px;margin-bottom:8px">📝 Nota del cliente: ' + esc(o.notes) + '</div>' : '') +
                 (adm ? '<div style="display:flex;justify-content:space-between;font-weight:900;margin-bottom:10px;font-size:15px"><span style="color:#94a3b8">Total</span><span style="color:#34d399">' + $m(totalOf(o)) + '</span></div>' : '') +
                 '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
@@ -8262,18 +8264,23 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             if (adm && window.QRCode && document.getElementById('llv-qr')) { try { new QRCode(document.getElementById('llv-qr'), { text: link(), width: 96, height: 96 }); } catch (e) {} }
         }
         window.llvSound = function () { chime(); try { Notification.requestPermission(); } catch (e) {} showToast('Sonido y avisos activados', 'success'); };
-        function ticksGet(id) { try { return (JSON.parse(localStorage.getItem('llv_ticks') || '{}')[id]) || []; } catch (e) { return []; } }
+        // Palomitas de cocina: se guardan en la configuración sincronizada para que el admin y la cocina vean lo mismo
+        function ticksGet(id) { try { return ((storeConfig.webTicks || {})[id]) || []; } catch (e) { return []; } }
         window.llvTick = function (id, idx) {
             try {
-                var all = JSON.parse(localStorage.getItem('llv_ticks') || '{}'), a = all[id] || [], p = a.indexOf(idx);
+                if (!storeConfig.webTicks) storeConfig.webTicks = {};
+                var a = (storeConfig.webTicks[id] || []).slice(), p = a.indexOf(idx);
                 if (p >= 0) a.splice(p, 1); else a.push(idx);
-                all[id] = a;
-                var keep = {}; orders.forEach(function (o) { if (all[o._id]) keep[o._id] = all[o._id]; });
-                localStorage.setItem('llv_ticks', JSON.stringify(keep));
+                storeConfig.webTicks[id] = a;
+                var keep = {}; orders.forEach(function (o) { if (storeConfig.webTicks[o._id]) keep[o._id] = storeConfig.webTicks[o._id]; });
+                storeConfig.webTicks = keep;
+                saveData();
             } catch (e) {}
             try { playUiSound('confirm'); } catch (e) {}
             try { renderKitchenView(); } catch (e) {}
+            render();
         };
+        window.llvRender = function () { render(); };
         window.llvStart = function (id) {
             var o = orders.find(function (x) { return x._id === id; }); if (!o || o.status !== 'cocina') return;
             var bl = (typeof window.kitchenWebBlocker === 'function') ? window.kitchenWebBlocker(id) : null;
