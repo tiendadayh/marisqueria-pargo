@@ -8049,7 +8049,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                         '<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px"><tbody>' + rows + '</tbody></table>' +
                         '<div style="margin-top:10px;padding:10px 12px;background:#0f172a;color:#fff;border-radius:10px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Total pagado</span><span style="font-size:18px;font-weight:900;color:#fcd34d">' + $m(totalOf(o)) + ' MXN</span></div>' +
                         '<div style="text-align:center;margin-top:12px;font-size:11px;color:#475569"><b>¡Gracias por tu compra!</b><br>Te esperamos pronto 🦐</div>';
-                    var stl = document.createElement('style'); stl.id = 'llv-pdf-style'; stl.textContent = 'html.llevar body > .html2pdf__overlay{display:block!important}'; document.head.appendChild(stl);
+                    var stl = document.createElement('style'); stl.id = 'llv-pdf-style'; stl.textContent = 'html.llevar body > div.html2pdf__overlay:not(#a1):not(#a2):not(#a3):not(#a4){display:block!important}'; document.head.appendChild(stl);
                     var im = box.querySelector('img'); if (im) { try { await im.decode(); } catch (e) {} }
                     var canvas = await html2pdf().set({ html2canvas: { scale: 2.5, useCORS: true, logging: false, backgroundColor: '#ffffff' } }).from(box).toCanvas().get('canvas');
                     if (!canvas || !canvas.width || !canvas.height) throw new Error('canvas vacio');
@@ -8062,7 +8062,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                     setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
                     window.llvPop('🧾 Ticket descargado', 'Busca el PDF en tus descargas.', '#059669');
                 } catch (e) {
-                    window.llvPop('No se pudo generar el PDF', 'Intenta de nuevo con el botón "Descargar ticket PDF".', '#7f1d1d');
+                    try { console.error('Ticket PDF:', e); } catch (_e) {} window.llvPop('No se pudo generar el PDF', 'Intenta de nuevo con el botón "Descargar ticket PDF".' + (e && e.message ? ' (' + String(e.message).slice(0, 90) + ')' : ''), '#7f1d1d');
                 } finally {
                     var _st = document.getElementById('llv-pdf-style'); if (_st) _st.remove();
                     llvTkBusy = false;
