@@ -8327,5 +8327,48 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
         }, 1000);
     })();
     </script>
+
+    <script>
+    /* Pantalla siempre encendida (cocina, mesera, admin): evita que el teléfono se bloquee y deje de avisar */
+    (function () {
+        var Q = new URLSearchParams(location.search);
+        if (Q.get('vista') === 'llevar' || Q.get('mesa')) return; // clientes: no aplica
+        if (!('wakeLock' in navigator)) return;
+        var lock = null, want = true, pill = null;
+        try { want = localStorage.getItem('pargo_wl_off') !== '1'; } catch (e) {}
+        function paint() {
+            if (!pill) return;
+            var on = !!lock;
+            pill.textContent = on ? '🔆 Pantalla activa' : '🌙 Pantalla puede apagarse';
+            pill.style.background = on ? 'rgba(16,185,129,.18)' : 'rgba(100,116,139,.25)';
+            pill.style.color = on ? '#6ee7b7' : '#cbd5e1';
+            pill.style.borderColor = on ? 'rgba(16,185,129,.5)' : 'rgba(148,163,184,.4)';
+        }
+        function acquire() {
+            if (!want || lock || document.visibilityState !== 'visible') return;
+            navigator.wakeLock.request('screen').then(function (l) {
+                lock = l; paint();
+                l.addEventListener('release', function () { lock = null; paint(); });
+            }).catch(function () { lock = null; paint(); });
+        }
+        function release() { try { if (lock) lock.release(); } catch (e) {} lock = null; paint(); }
+        function mount() {
+            pill = document.createElement('button');
+            pill.type = 'button';
+            pill.title = 'Mantiene la pantalla encendida para que lleguen los avisos de pedidos. Toca para activar o desactivar.';
+            pill.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9990;padding:5px 10px;border-radius:999px;border:1px solid;font-size:10px;font-weight:800;backdrop-filter:blur(6px);opacity:.85;min-height:0';
+            pill.onclick = function () {
+                want = !want;
+                try { localStorage.setItem('pargo_wl_off', want ? '0' : '1'); } catch (e) {}
+                if (want) acquire(); else release();
+                if (typeof showToast === 'function') showToast(want ? 'La pantalla se mantendrá encendida' : 'La pantalla podrá apagarse', 'info');
+            };
+            document.body.appendChild(pill); paint(); acquire();
+        }
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') acquire(); });
+        ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, acquire, { passive: true }); });
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+    })();
+    </script>
 </body>
 </html>
