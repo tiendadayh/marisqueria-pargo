@@ -2131,11 +2131,17 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (!items || !items.length) return;
             rolloverKitchenSeqIfNewDay();
             if (!storeConfig.kitchenSeqDay) storeConfig.kitchenSeqDay = localDayKey();
-            storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
-            const n = storeConfig.kitchenSeq;
+            // Folio por CLIENTE: se asigna en la primera comanda de la mesa y se conserva hasta que pague / se libere
+            const _today = localDayKey();
+            if (!(table.folioN > 0) || table.folioDay !== _today) {
+                storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
+                table.folioN = storeConfig.kitchenSeq;
+                table.folioDay = _today;
+            }
+            const n = table.folioN;
             if (!Array.isArray(table.kitchen)) table.kitchen = [];
             table.kitchen.push({
-                id: 'K' + n + '-' + Date.now().toString(36),
+                id: 'K' + n + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
                 n: n,
                 kind: kind || 'order',
                 note: note || '',
@@ -2154,12 +2160,13 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 else { _k.status = 'ready'; _k.readyAt = _k.at; _k.startedAt = _k.at; _k.drinksOnly = true; }
             }
         }
+        function kTime(at) { const t = new Date(at).getTime(); return isNaN(t) ? 0 : t; }
         function kitchenNumLabel(n) { return '#' + String(((Number(n) || 1) - 1) % 999 + 1).padStart(3, '0'); }
         function kitchenElapsedMin(iso) { return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000)); }
         function allKitchenTickets() {
             const list = [];
             tables.forEach(t => (t.kitchen || []).forEach(k => { if (k.status !== 'served') list.push({ t, k }); }));
-            list.sort((a, b) => (a.k.n || 0) - (b.k.n || 0) || String(a.k.at).localeCompare(String(b.k.at)));
+            list.sort((a, b) => kTime(a.k.at) - kTime(b.k.at));
             return list;
         }
         function tableKitchenState(table) {
@@ -2169,7 +2176,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (act.some(k => k.status === 'new')) return 'new';
             return '';
         }
-        function webQueueRaw() { try { return (typeof window.llvKitchenOrders === 'function' ? window.llvKitchenOrders() : []).slice().sort((a, b) => a.n - b.n); } catch (e) { return []; } }
+        function webQueueRaw() { try { return (typeof window.llvKitchenOrders === 'function' ? window.llvKitchenOrders() : []).slice().sort((a, b) => kTime(a.at) - kTime(b.at)); } catch (e) { return []; } }
         function webKitchenEntries(tk, selfId) {
             const out = [];
             webQueueRaw().forEach(w => {
@@ -2189,7 +2196,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const n = Math.max(1, Math.min(3, Number(storeConfig.kitchenStations) || 1));
             const tk = allKitchenTickets().filter(x => x.k.id !== k.id && x.k.kind !== 'cancel' && kitchenNeedsTicket(x.k) && (x.k.status === 'new' || x.k.status === 'cooking'));
             const act = tk.concat(webKitchenEntries(tk, k.id));
-            const before = x => (x.k.n || 0) < (k.n || 0) || ((x.k.n || 0) === (k.n || 0) && String(x.k.at) < String(k.at));
+            const before = x => kTime(x.k.at) < kTime(k.at);
             // 1) hay un pedido anterior que aún no se empieza: ese va primero
             const waiting = act.find(x => x.k.status === 'new' && before(x));
             if (waiting) return waiting;
@@ -2360,7 +2367,10 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                                 <span class="text-3xl font-black text-amber-400">${kitchenNumLabel(k.n)}</span>
                                 <span class="text-xl font-black text-white">${escapeHtmlText(t.name)}</span>
                             </div>
-                            <p class="text-[11px] text-slate-400 font-semibold">${staffAvatarHtml(k.waiter || t.waiter, 26, true)}${escapeHtmlText(k.waiter || t.waiter || '')}${t.guests ? ' · ' + t.guests + ' pers.' : ''} · Ronda ${k.round || 1} · ${hora}${kitchenTimingText(k)}</p>
+                            ${isCancel ? '' : ((k.round || 1) > 1
+                                ? `<span class="inline-block mt-1 px-2 py-0.5 rounded-md bg-yellow-400 text-slate-950 text-[11px] font-black">🟡 VOLVIÓ A PEDIR (pedido ${k.round})</span>`
+                                : '<span class="inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[11px] font-black">🟢 NUEVO</span>')}
+                            <p class="text-[11px] text-slate-400 font-semibold">${staffAvatarHtml(k.waiter || t.waiter, 26, true)}${escapeHtmlText(k.waiter || t.waiter || '')}${t.guests ? ' · ' + t.guests + ' pers.' : ''} · ${hora}${kitchenTimingText(k)}</p>
                         </div>
                         <span class="px-2 py-1 rounded-lg text-xs font-black whitespace-nowrap ${timeCls}"><i class="fa-regular fa-clock mr-1"></i>${mins} min</span>
                     </div>
@@ -2392,9 +2402,9 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 <span class="px-2.5 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30">En preparación ${counts.cooking}</span>
                 <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Listos ${counts.ready}</span>`;
             board.innerHTML = cols.map(col => {
-                const entries = all.filter(x => x.k.status === col.key).map(x => ({ n: x.k.n || 0, at: String(x.k.at || ''), html: kitchenCardHtml(x) }))
-                    .concat(webCards(col.key).map(w => ({ n: w.n || 0, at: String(w.at || ''), html: w.html })))
-                    .sort((a, b) => (a.n - b.n) || a.at.localeCompare(b.at));
+                const entries = all.filter(x => x.k.status === col.key).map(x => ({ at: kTime(x.k.at), html: kitchenCardHtml(x) }))
+                    .concat(webCards(col.key).map(w => ({ at: kTime(w.at), html: w.html })))
+                    .sort((a, b) => a.at - b.at);
                 const cards = entries;
                 return `
                     <div class="space-y-3">
@@ -4530,7 +4540,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             targetTable.items = JSON.parse(JSON.stringify(sourceTable.items));
             targetTable.kitchen = JSON.parse(JSON.stringify(sourceTable.kitchen || []));
             targetTable.kitchen.forEach(k => { k.tableName = targetTable.name; });
-            sourceTable.kitchen = []; sourceTable.orderRounds = 0;
+            targetTable.orderRounds = sourceTable.orderRounds || 0; targetTable.folioN = sourceTable.folioN || 0; targetTable.folioDay = sourceTable.folioDay || '';
+            sourceTable.kitchen = []; sourceTable.orderRounds = 0; sourceTable.folioN = 0; sourceTable.folioDay = '';
 
             targetTable.calling = !!sourceTable.calling;
             sourceTable.calling = false;
@@ -4671,7 +4682,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (table) {
                 table.status = 'free';
                 table.items = [];
-                table.kitchen = []; table.orderRounds = 0;
+                table.kitchen = []; table.orderRounds = 0; table.folioN = 0; table.folioDay = '';
                 table.guests = 0;
                 table.calling = false;
                 table.customerPhone = '';
@@ -5778,7 +5789,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             } else {
                 table.status = 'free';
                 table.items = [];
-                table.kitchen = []; table.orderRounds = 0;
+                table.kitchen = []; table.orderRounds = 0; table.folioN = 0; table.folioDay = '';
                 table.guests = 0;
                 table.calling = false;
                 table.customerPhone = '';
