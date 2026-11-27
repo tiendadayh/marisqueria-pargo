@@ -204,6 +204,13 @@
         .caja-num { width:1.6rem; height:1.6rem; border-radius:.55rem; background:rgba(56,189,248,.14); border:1px solid rgba(56,189,248,.35); color:#7dd3fc; font-weight:900; font-size:.75rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:.1rem; }
         .caja-sec h3 { font-size:.85rem; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:.06em; }
         .caja-sec p { font-size:.7rem; color:#94a3b8; margin-top:.1rem; line-height:1.35; }
+        .dish-frame { position:relative; overflow:hidden; aspect-ratio:3/2; background:#0b1220; }
+        .dish-frame::before { content:''; position:absolute; inset:-14px; background:var(--bg) center/cover no-repeat; filter:blur(14px) brightness(.65); }
+        .dish-frame > img { position:relative; width:100%; height:100%; }
+        .dish-fit { object-fit: contain !important; background: #0b1220; }
+        .dish-fit[src^="data:image/svg"] { object-fit: cover !important; }
+        /* Miniaturas 3:2 (fotos de 1200x800): se ven completas y sin barras negras */
+        .dish-thumb { height:auto !important; aspect-ratio:3/2; object-fit:cover !important; }
         .caja-fchip { display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .85rem; border-radius:9999px; font-size:.7rem; font-weight:800; border:1px solid rgba(51,65,85,.8); color:#94a3b8; background:rgba(15,23,42,.8); cursor:pointer; transition:.15s; white-space:nowrap; }
         .caja-fchip:hover { color:#e2e8f0; border-color:rgba(100,116,139,.9); }
         .caja-fchip.on { background:rgba(56,189,248,.15); border-color:rgba(56,189,248,.5); color:#7dd3fc; }
@@ -669,8 +676,8 @@
                                 <label class="block text-slate-300 font-semibold">Fotografía del Producto</label>
                                 
                                 <div class="flex items-center gap-3">
-                                    <div class="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
-                                        <img id="catalog-img-preview" src="" alt="Vista previa" class="w-full h-full object-cover hidden">
+                                    <div class="w-24 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0" style="aspect-ratio:3/2">
+                                        <img id="catalog-img-preview" src="" alt="Vista previa" class="w-full h-full dish-fit dish-thumb hidden" style="height:100% !important">
                                         <i id="catalog-img-placeholder" class="fa-regular fa-image text-slate-500 text-xl"></i>
                                     </div>
                                     <div class="flex-1 space-y-1.5">
@@ -1825,11 +1832,13 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             return n ? `<span style="display:inline-block;min-width:18px;text-align:center;background:#0f172a;color:#fbbf24;border-radius:5px;padding:1px 5px;font-size:9px;font-weight:900;margin-right:5px;">${n}</span>` : '';
         }
         // Foto del platillo (misma imagen en mesera, cliente, admin y cocina); busca por sku en el catálogo
+        // Marco de foto 3:2: la foto se ve COMPLETA y lo que sobra se rellena con la misma foto difuminada
+        function dishBgStyle(src) { return src ? `--bg:url('${String(src).replace(/'/g, '%27')}')` : ''; }
         function dishImgHtml(entry, cls) {
             const prod = entry && entry.sku ? catalog.find(p => p.sku === entry.sku) : null;
             const src = (entry && entry.image) || (prod && prod.image) || '';
             const cat = escapeHtmlText((prod && prod.category) || '');
-            return `<img src="${escapeHtmlText(src || menuIcon(cat))}" alt="" loading="lazy" class="${cls} object-cover shrink-0" onerror="this.onerror=null;this.src=menuIcon('${cat}')">`;
+            return `<img src="${escapeHtmlText(src || menuIcon(cat))}" alt="" loading="lazy" class="${cls} dish-fit dish-thumb shrink-0" onerror="this.onerror=null;this.src=menuIcon('${cat}')">`;
         }
         // Foto grande del platillo al tocarla (cliente y mesera)
         function dishZoomSku(sku) {
@@ -1837,7 +1846,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             let o = document.getElementById('dish-zoom');
             if (!o) { o = document.createElement('div'); o.id = 'dish-zoom'; o.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(2,6,15,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out'; o.onclick = () => o.remove(); document.body.appendChild(o); }
             const fb = menuIcon(p.category);
-            o.innerHTML = `<div style="max-width:560px;width:100%;background:#0f172a;border:1px solid #334155;border-radius:20px;overflow:hidden" onclick="event.stopPropagation()"><img src="${escapeHtmlText(p.image || fb)}" onerror="this.onerror=null;this.src=menuIcon('${escapeHtmlText(p.category || '')}')" style="width:100%;max-height:60vh;object-fit:cover;display:block"><div style="padding:14px 16px;color:#fff"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:18px">${escapeHtmlText(p.name)}</b><b style="font-size:18px;color:#34d399">$${Number(p.price).toFixed(2)}</b></div>${p.desc ? `<p style="font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.4">${escapeHtmlText(p.desc)}</p>` : ''}<button onclick="document.getElementById('dish-zoom').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:12px;background:#334155;color:#fff;font-weight:800">Cerrar</button></div></div>`;
+            o.innerHTML = `<div style="max-width:560px;width:100%;background:#0f172a;border:1px solid #334155;border-radius:20px;overflow:hidden" onclick="event.stopPropagation()"><img src="${escapeHtmlText(p.image || fb)}" onerror="this.onerror=null;this.src=menuIcon('${escapeHtmlText(p.category || '')}')" style="width:100%;max-height:60vh;object-fit:contain;background:#0b1220;display:block"><div style="padding:14px 16px;color:#fff"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:18px">${escapeHtmlText(p.name)}</b><b style="font-size:18px;color:#34d399">$${Number(p.price).toFixed(2)}</b></div>${p.desc ? `<p style="font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.4">${escapeHtmlText(p.desc)}</p>` : ''}<button onclick="document.getElementById('dish-zoom').remove()" style="margin-top:12px;width:100%;padding:10px;border-radius:12px;background:#334155;color:#fff;font-weight:800">Cerrar</button></div></div>`;
         }
         function parseDishEntry(raw) {
             const m = String(raw || '').trim().toLowerCase().match(/^(?:(\d{1,2})\s*[x*]\s*)?(\d{1,3})$/);
@@ -2153,7 +2162,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const foodRows = idxItems.filter(x => !isDrinkItem(x.i)).map(({ i, idx }) => `
                 <div class="flex items-start gap-3 py-2 border-b border-slate-800/80 last:border-0 ${i.done ? 'opacity-60' : ''}">
                     <span class="text-2xl font-black text-white w-12 shrink-0 text-right">${i.qty}×</span>
-                    ${dishImgHtml(i, 'w-16 h-16 rounded-xl border border-slate-700')}
+                    ${dishImgHtml(i, 'w-24 rounded-xl border border-slate-700')}
                     <div class="min-w-0 flex-1">
                         <p class="text-base font-extrabold text-white leading-tight ${i.done ? 'line-through' : ''}">${dishBadge(i.num, true)} ${escapeHtmlText(i.name)}</p>
                         ${dishDescHtml(i.sku, 'mt-0.5 text-[11px] text-slate-400 leading-snug')}
@@ -4716,7 +4725,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const conf = it ? getConfirmedQty(it) : 0;
                 const q = it ? getPendingQty(it) : 0; // solo lo nuevo, por confirmar (lo confirmado ya no cuenta aquí)
                 const canMinus = q > 0;
-                const img = `<div class="relative"><img src="${prod.image}" onclick="event.stopPropagation();dishZoomSku('${prod.sku}')" class="w-full h-28 md:h-36 object-cover cursor-zoom-in ${available ? '' : 'grayscale opacity-60'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
+                const img = `<div class="relative dish-frame" style="${dishBgStyle(prod.image)}"><img src="${prod.image}" onclick="event.stopPropagation();dishZoomSku('${prod.sku}')" class="dish-fit cursor-zoom-in ${available ? '' : 'grayscale opacity-60'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                         <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
                         ${q > 0 ? `<div class="absolute top-1.5 right-1.5 min-w-[1.75rem] h-7 px-1.5 rounded-full bg-orange-500 text-slate-950 text-sm font-black flex items-center justify-center shadow-lg">${q}</div>` : ''}
                         ${conf > 0 ? `<div class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-emerald-500 text-slate-950 text-[10px] font-black shadow">🔒 ${conf} ya confirmado${conf > 1 ? 's' : ''}</div>` : ''}
@@ -4933,7 +4942,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             return `
                 <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950 p-2.5 rounded-xl border ${pending > 0 ? 'border-amber-500/40' : 'border-slate-800'}">
                     <div class="flex items-center gap-2.5 min-w-0 flex-1 basis-48">
-                        ${dishImgHtml(item, 'w-10 h-10 rounded-lg shrink-0')}
+                        ${dishImgHtml(item, 'w-14 rounded-lg shrink-0')}
                         <div class="min-w-0 break-words">
                             <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${item.name}</h5>
                             <p class="text-[10px] text-slate-400">$${item.price.toFixed(2)} c/u · total ${item.qty}</p>
@@ -5770,7 +5779,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const rows = table.items.length > 0
                     ? `<div class="space-y-1.5 max-h-32 overflow-y-auto pr-1">${table.items.map(item => `
                         <div class="flex items-start gap-2 bg-slate-950/70 border border-slate-800/80 rounded-xl px-2.5 py-1.5">
-                            ${dishImgHtml(item, 'w-9 h-9 rounded-lg')}<span class="shrink-0 min-w-[1.6rem] text-center rounded-md bg-slate-800 text-amber-300 text-[11px] font-black py-0.5">${item.qty}×</span>
+                            ${dishImgHtml(item, 'w-14 rounded-lg')}<span class="shrink-0 min-w-[1.6rem] text-center rounded-md bg-slate-800 text-amber-300 text-[11px] font-black py-0.5">${item.qty}×</span>
                             <div class="min-w-0 flex-1"><p class="text-[11px] font-bold text-slate-100 leading-tight">${item.name}</p>${itemNotesHtml(table, item)}<div>${itemKitchenBadgesHtml(table, item)}</div></div>
                             <span class="font-mono text-[11px] font-bold text-emerald-400 shrink-0">$${(item.price * item.qty).toFixed(0)}</span>
                         </div>`).join('')}</div>`
@@ -6106,19 +6115,20 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const file = e.target.files[0];
             if (!file) return;
             if (!/^image\//.test(file.type)) { showToast('Elige un archivo de imagen', 'warning'); return; }
-            // Se recorta al centro en formato cuadrado y se comprime: así todas las fotos
-            // se ven iguales en la web de pedidos, mesera, cocina, admin y PDF (y pesan poco).
+            // Se guarda la foto COMPLETA (sin recortar), solo se reduce de tamaño y se comprime
+            // para que pese poco. Así se ve entera en la web de pedidos, mesera, cocina, admin y PDF.
             const url = URL.createObjectURL(file);
             const img = new Image();
             img.onload = () => {
-                const side = Math.min(img.width, img.height);
-                const out = Math.max(1, Math.min(640, side));
+                const MAXS = 800;
+                const k = Math.min(1, MAXS / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
                 const c = document.createElement('canvas');
-                c.width = out; c.height = out;
+                c.width = w; c.height = h;
                 const ctx = c.getContext('2d');
                 ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, out, out);
-                ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, out, out);
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
                 URL.revokeObjectURL(url);
                 uploadedBase64Photo = c.toDataURL('image/jpeg', 0.82);
                 updateCatalogImagePreview(uploadedBase64Photo);
@@ -6289,7 +6299,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 tr.className = "hover:bg-slate-800/40 transition-colors";
                 tr.innerHTML = `
                     <td class="p-3 hidden sm:table-cell">
-                        <img src="${prod.image}" class="w-9 h-9 rounded-lg object-cover ${available ? '' : 'grayscale opacity-60'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
+                        <img src="${prod.image}" class="w-14 rounded-lg dish-fit dish-thumb ${available ? '' : 'grayscale opacity-60'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                     </td>
                     <td class="p-3">
                         <div class="font-bold text-white">${dishBadge(dishNum(prod))}${prod.name}</div>
@@ -6347,7 +6357,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                         <div class="grid grid-cols-2 gap-3">
                             ${items.map(prod => `
                                 <div class="flex items-center gap-3 border border-slate-200 rounded-xl p-2 bg-white" style="break-inside: avoid; page-break-inside: avoid;">
-                                    <img src="${prod.image}" crossorigin="anonymous" class="w-16 h-16 rounded-lg object-cover shrink-0" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
+                                    <img src="${prod.image}" crossorigin="anonymous" class="rounded-lg shrink-0" style="width:108px;height:72px;object-fit:cover;background:#f1f5f9;" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                                     <div class="min-w-0 flex-1">
                                         <h4 class="font-extrabold text-slate-900 text-xs leading-tight">${dishBadgePrint(dishNum(prod))}${prod.name}</h4>
                                         ${prod.desc ? `<p class="text-[10px] text-slate-500 leading-tight mt-0.5">${prod.desc}</p>` : ''}
@@ -7111,8 +7121,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const available = isItemAvailable(prod);
             return `
                     <div class="bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden ${available ? '' : 'opacity-70'}">
-                        <div class="relative cursor-zoom-in" onclick="dishZoomSku('${prod.sku}')">
-                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="w-full h-28 object-cover ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
+                        <div class="relative cursor-zoom-in dish-frame" style="${dishBgStyle(prod.image)}" onclick="dishZoomSku('${prod.sku}')">
+                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="dish-fit ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
                             <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
                             <span class="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold ${available ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white'}">${available ? 'Disponible' : 'Agotado'}</span>
                         </div>
@@ -7168,7 +7178,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     itemsHtml += `
                         <div class="flex items-center justify-between bg-slate-900 p-3 rounded-2xl border border-slate-800">
                             <div class="flex items-center gap-3">
-                                ${dishImgHtml(item, 'w-10 h-10 rounded-xl')}
+                                ${dishImgHtml(item, 'w-14 rounded-xl')}
                                 <div>
                                     <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${item.name}</h5>
                                     <p class="text-[10px] text-slate-400">$${item.price.toFixed(2)} x ${item.qty} u.</p>
@@ -7187,8 +7197,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const available = isItemAvailable(prod);
                 return `
                     <div class="bg-slate-900/80 rounded-2xl border border-slate-800 overflow-hidden ${available ? '' : 'opacity-70'}">
-                        <div class="relative cursor-zoom-in" onclick="dishZoomSku('${prod.sku}')">
-                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="w-full h-28 object-cover ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.onerror=null;this.src=menuIcon('${prod.category}')">
+                        <div class="relative cursor-zoom-in dish-frame" style="${dishBgStyle(prod.image)}" onclick="dishZoomSku('${prod.sku}')">
+                            <img src="${escapeHtmlText(prod.image || '')}" loading="lazy" class="dish-fit ${available ? '' : 'grayscale'}" onerror="this.onerror=null;this.onerror=null;this.src=menuIcon('${prod.category}')">
                             <div class="absolute top-1.5 left-1.5">${dishBadge(dishNum(prod))}</div>
                             <span class="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md text-[9px] font-extrabold ${available ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white'}">${available ? 'Disponible' : 'Agotado'}</span>
                         </div>
@@ -7823,7 +7833,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv-desc{font-family:Fraunces,Georgia,serif;font-weight:400;font-size:15px;line-height:1.4;color:#a5c8e3;margin:5px 0 10px}
 .lv-act{margin-top:auto}
 .lv-imgbox{--s:96px;flex:none;width:var(--s);height:var(--s);border-radius:14px;border:2px solid #1e4a78;overflow:hidden;background:#16344f}
-.lv-img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+.lv-img{display:block;width:100%;height:100%;object-fit:contain!important;object-position:center;background:#0b2238}
+.lv-img[src^="data:image/svg"]{object-fit:cover!important}
 .lv-add{width:40px;height:40px;border-radius:12px;background:#ff5a2c;color:#fff;border:2px solid #ffb38f;box-shadow:3px 3px 0 #020b14;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:transform .08s,box-shadow .08s}
 .lv-add:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #020b14}
 .lv-add[disabled]{background:#264a68;color:#a5c8e3;box-shadow:none;width:auto;padding:0 14px;font-size:13px}
@@ -7861,7 +7872,8 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 .lv{padding-bottom:96px}
 .lv-zoom{position:fixed;inset:0;z-index:100000;background:rgba(2,11,20,.9);display:flex;align-items:center;justify-content:center;padding:16px}
 .lv-zoom-in{width:100%;max-width:520px;background:#0b2238;border:2px solid #1e4a78;border-radius:22px;overflow:hidden;color:#e6f3fc;box-shadow:8px 8px 0 #020b14}
-.lv-zoom-in img{display:block;width:100%;max-height:55vh;object-fit:cover;background:#16344f}
+.lv-zoom-in img{display:block;width:100%;max-height:55vh;object-fit:contain!important;background:#16344f}
+.lv-zoom-in img[src^="data:image/svg"]{object-fit:cover!important}
 .lv-zoom-b{padding:16px 18px 18px}
 .lv-zoom-b h3{margin:0 0 6px;font-family:Archivo,Inter,sans-serif;font-weight:900;font-size:22px;color:#fff}
 .lv-zoom-b p{margin:0 0 12px;font-size:14px;color:#a9c6df}
@@ -7915,7 +7927,10 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
 }
 .lv-grid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(165px,1fr))!important;gap:12px!important;padding:14px!important}
 .lv-card,.lv-card:last-child,.lv-card:nth-child(odd):nth-last-child(2){flex-direction:column!important;gap:0!important;padding:0!important;border:1px solid #1e4a78!important;border-radius:16px!important;background:#06182a!important;overflow:hidden;position:relative}
-.lv-card .lv-imgbox{order:-1;width:100%!important;height:125px!important;--s:100%;border:0;border-radius:0;position:relative}
+.lv-card .lv-imgbox{order:-1;width:100%!important;height:auto!important;aspect-ratio:3/2;--s:100%;border:0;border-radius:0;position:relative;background:#0b2238}
+.lv-card .lv-imgbox::before{content:'';position:absolute;inset:-14px;background:var(--bg) center/cover no-repeat;filter:blur(14px) brightness(.65)}
+.lv-card .lv-img{position:relative;height:100%!important;max-height:none;object-fit:contain!important}
+.lv-card .lv-img[src^="data:image/svg"]{object-fit:cover!important}
 .lv-card .lv-text{padding:10px}
 .lv-line1{flex-direction:column;align-items:flex-start;gap:2px}
 .lv-dots{display:none}
@@ -8114,7 +8129,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
                 var body = cats.map(function (c) {
                     var list = avail.filter(function (p) { return p.category === c.key; });
                     return `<section id="cat-${c.key}" class="lv-sec"><div class="lv-cat"><div class="lv-cat-head"><h2>${esc(c.label)}</h2><span class="lv-count">${list.length} ${list.length === 1 ? 'opción' : 'opciones'}</span></div><div class="lv-grid">` + list.map(function (p) {
-                        return `<div class="lv-card${p.available === false ? ' off' : ''}" data-n="${numMap()[p.sku] || ''}" data-q="${esc(norm(p.name + ' ' + (p.desc || '')))}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox" onclick="llvZoom('${p.sku}')">${numBadge(p.sku).replace('class="lv-num"', 'class="lv-num lv-num-abs"')}<img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
+                        return `<div class="lv-card${p.available === false ? ' off' : ''}" data-n="${numMap()[p.sku] || ''}" data-q="${esc(norm(p.name + ' ' + (p.desc || '')))}"><div class="lv-text"><div class="lv-line1"><span class="lv-name">${esc(p.name)}</span><span class="lv-dots"></span><span class="lv-price">${$m(p.price)}</span></div>${p.desc ? `<div class="lv-desc">${esc(p.desc)}</div>` : '<div style="height:8px"></div>'}<div class="lv-act"><span id="ctl-${p.sku}">${ctl(p.sku)}</span></div><div id="note-${p.sku}">${noteBox(p.sku)}</div></div><div class="lv-imgbox" style="${dishBgStyle(p.image)}" onclick="llvZoom('${p.sku}')">${numBadge(p.sku).replace('class="lv-num"', 'class="lv-num lv-num-abs"')}<img class="lv-img" loading="lazy" decoding="async" alt="${esc(p.name)}" src="${esc(p.image || menuIcon(p.category))}" onerror="this.onerror=null;this.src=menuIcon('${c.key}')"></div></div>`;
                     }).join('') + '</div></div></section>';
                 }).join('');
                 var consulta = '<div style="margin:0 0 14px;padding:12px;border-radius:14px;background:#0f172a;border:1px solid #1e293b"><div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:6px">🔎 ¿Ya hiciste un pedido hoy? Consulta cómo va</div><div style="display:flex;gap:8px"><input id="llv-code" class="lv-in" maxlength="4" autocapitalize="characters" placeholder="Tu código (4 letras)" style="margin:0;flex:1;text-transform:uppercase"><button onclick="llvFind()" style="padding:0 16px;border-radius:12px;background:#0284c7;color:#fff;font-weight:800">Ver</button></div><p id="llv-find-err" style="color:#fb7185;font-size:12px;min-height:14px;margin:6px 0 0"></p></div>';
