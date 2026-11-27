@@ -5,7 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#06182a">
     <script>try{if(new URLSearchParams(location.search).get('vista')==='llevar')document.documentElement.classList.add('llevar');}catch(e){}</script>
-    <style>html.llevar body > *:not(#llevar-root):not(script):not(#toast-container){display:none!important}</style>
+    <style>html.llevar body > *:not(#llevar-root):not(script):not(#toast-container){display:none!important}
+        /* ===== Meseros: tarjetas y formulario ===== */
+        .stf-box { background: rgba(2,6,23,.55); border: 1px solid #1e293b; border-radius: 14px; padding: 12px; display: grid; gap: 12px; }
+        .stf-box-t { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #fbbf24; display: flex; align-items: center; gap: 6px; }
+        .stf-card { background: linear-gradient(180deg,#111c33,#0f172a); border: 1px solid #1e293b; border-radius: 18px; padding: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 14px; transition: border-color .15s, transform .15s; }
+        .stf-card:hover { border-color: rgba(251,191,36,.45); transform: translateY(-1px); }
+        .stf-top { display: flex; align-items: center; gap: 12px; }
+        .stf-av { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(135deg,#fb923c,#fbbf24); color: #1c1917; font-weight: 900; font-size: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .stf-name { font-weight: 800; color: #fff; font-size: 15px; line-height: 1.2; word-break: break-word; }
+        .stf-role { display: inline-block; margin-top: 3px; padding: 2px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; background: rgba(251,191,36,.14); color: #fbbf24; }
+        .stf-rows { display: grid; gap: 8px; }
+        .stf-row { display: flex; align-items: center; gap: 8px; background: rgba(2,6,23,.6); border: 1px solid #1e293b; border-radius: 12px; padding: 8px 10px; min-height: 42px; }
+        .stf-lbl { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; width: 92px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; }
+        .stf-val { flex: 1; min-width: 0; color: #f1f5f9; font-size: 14px; font-weight: 800; word-break: break-all; }
+        .stf-pw { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; color: #fbbf24; }
+        .stf-pw.off { color: #64748b; font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0; }
+        .stf-mini { width: 30px; height: 30px; border-radius: 9px; background: #1e293b; color: #cbd5e1; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+        .stf-mini:hover { background: #334155; color: #fbbf24; }
+        .stf-actions { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+        .stf-btn { padding: 9px 10px; border-radius: 11px; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #1e293b; color: #e2e8f0; }
+        .stf-btn:hover { background: #334155; }
+        .stf-btn.amber { background: rgba(251,191,36,.15); color: #fbbf24; }
+        .stf-btn.amber:hover { background: rgba(251,191,36,.25); }
+        .stf-btn.red { background: rgba(244,63,94,.12); color: #fb7185; padding: 9px 12px; }
+        .stf-btn.red:hover { background: rgba(244,63,94,.22); }
+        .stf-empty { grid-column: 1 / -1; text-align: center; padding: 36px 16px; border: 2px dashed #1e293b; border-radius: 18px; color: #64748b; font-size: 13px; }
+    
+        /* ===== Vista previa del PDF: hojas tamaño carta, dos por fila ===== */
+        #pdf-pages-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+        @media (max-width: 700px) { #pdf-pages-grid { grid-template-columns: 1fr; } }
+        .pdf-slot { position: relative; width: 100%; aspect-ratio: 816 / 1054; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+        .pdf-slot-inner { position: absolute; left: 0; top: 0; transform-origin: top left; }
+        .pdf-page { width: 816px; height: 1054px; padding: 36px 40px 0; box-sizing: border-box; background: #fff; color: #0f172a; position: relative; overflow: hidden; }
+        .pdf-page-foot { position: absolute; left: 0; right: 0; bottom: 16px; text-align: center; font-size: 10px; color: #94a3b8; }
+    
+        /* ===== Foto de perfil del mesero ===== */
+        .staff-av-img { display: inline-block; border-radius: 9999px; object-fit: cover; flex-shrink: 0; vertical-align: middle; border: 2px solid rgba(251,191,36,.75); background: #0b1220; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+        .staff-av-ini { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; flex-shrink: 0; vertical-align: middle; background: linear-gradient(135deg,#fb923c,#fbbf24); color: #1c1917; font-weight: 900; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+        .sav-inline { margin-right: 6px; }
+    </style>
     <!-- App instalable (PWA) -->
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" type="image/png" href="icon-192.png">
@@ -496,9 +535,12 @@
                             <i class="fa-solid fa-id-badge text-orange-400"></i> Mesera en Turno:
                         </label>
                         <div class="flex items-center justify-between gap-2">
-                            <div class="min-w-0">
-                                <p id="waitress-session-name" class="text-sm font-black text-white truncate"></p>
-                                <p id="waitress-session-shift" class="text-[10px] text-slate-400"></p>
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <span id="waitress-session-avatar" class="shrink-0"></span>
+                                <div class="min-w-0">
+                                    <p id="waitress-session-name" class="text-sm font-black text-white truncate"></p>
+                                    <p id="waitress-session-shift" class="text-[10px] text-slate-400"></p>
+                                </div>
                             </div>
                             <button type="button" onclick="logoutWaitress()" class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-rose-950/70 text-rose-400 border border-slate-700 whitespace-nowrap">Cerrar sesión</button>
                         </div>
@@ -655,53 +697,58 @@
 
                 <!-- SUB-VISTA 3: GESTIÓN DE MESERAS -->
                 <div id="admin-sub-manage-staff" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-fit space-y-4">
+                    <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl h-fit space-y-4" id="staff-form-card">
                         <h3 class="font-bold text-white text-base flex items-center gap-2 border-b border-slate-800 pb-3">
-                            <i class="fa-solid fa-user-plus text-amber-400"></i> Registrar / Editar Mesera o Mesero
+                            <i class="fa-solid fa-user-plus text-amber-400"></i> <span id="staff-form-title">Registrar Mesera o Mesero</span>
                         </h3>
-                        <form id="staff-form" onsubmit="saveStaffAdmin(event)" class="space-y-3 text-xs">
+                        <form id="staff-form" onsubmit="saveStaffAdmin(event)" class="space-y-4 text-xs">
                             <input type="hidden" id="staff-id">
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Nombre Completo *</label>
-                                <input type="text" id="staff-name" required placeholder="ej. Mariana López" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500">
+                            <div class="flex items-center gap-4">
+                                <div id="staff-photo-box" class="w-24 h-24 rounded-full overflow-hidden bg-slate-800 border-2 border-slate-700 flex items-center justify-center shrink-0"></div>
+                                <div class="space-y-2 min-w-0">
+                                    <p class="text-slate-300 font-semibold">Foto de perfil <span class="text-slate-500 font-normal">(opcional)</span></p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <label class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-xs transition-all">
+                                            <i class="fa-solid fa-camera"></i> Subir / tomar foto
+                                            <input type="file" accept="image/*" onchange="handleStaffPhotoUpload(event)" class="hidden">
+                                        </label>
+                                        <button type="button" id="staff-photo-remove" onclick="removeStaffPhoto()" class="hidden px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold rounded-xl text-xs"><i class="fa-solid fa-trash-can"></i> Quitar</button>
+                                    </div>
+                                    <p class="text-[10px] text-slate-500">Se ve en admin, cocina y para el cliente en su mesa.</p>
+                                </div>
                             </div>
                             <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Usuario de acceso *</label>
-                                <input type="text" id="staff-user" required maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ej. mariana" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500">
-                                <p class="text-[10px] text-slate-500 mt-1">3 a 24 letras o números, sin espacios. Es el usuario con el que entra al enlace de meseras.</p>
+                                <label class="block text-slate-300 font-semibold mb-1.5">Nombre completo *</label>
+                                <input type="text" id="staff-name" required placeholder="ej. Mariana López" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500">
                             </div>
                             <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Contraseña (4 a 32 caracteres)</label>
-                                <input type="password" id="staff-pin" maxlength="32" autocomplete="new-password" placeholder="Obligatorio al registrar" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white tracking-[0.3em] focus:outline-none focus:border-amber-500">
-                                <p class="text-[10px] text-slate-500 mt-1">Al editar, déjala vacía para conservar la contraseña actual. Si la olvida, escribe una nueva aquí.</p>
-                            </div>
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Puesto</label>
-                                <select id="staff-role" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500">
+                                <label class="block text-slate-300 font-semibold mb-1.5">Puesto</label>
+                                <select id="staff-role" onchange="updateStaffPhotoPreview()" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500">
                                     <option value="Mesera">Mesera</option>
                                     <option value="Mesero">Mesero</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Turno</label>
-                                <select id="staff-shift" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500">
-                                    <option value="Turno Matutino">Turno Matutino</option>
-                                    <option value="Turno Vespertino">Turno Vespertino</option>
-                                    <option value="Turno Nocturno">Turno Nocturno</option>
-                                </select>
+                            <div class="stf-box">
+                                <p class="stf-box-t"><i class="fa-solid fa-key"></i> Datos para entrar al sistema</p>
+                                <div>
+                                    <label class="block text-slate-300 font-semibold mb-1.5">Usuario *</label>
+                                    <input type="text" id="staff-user" required maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ej. mariana" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500">
+                                    <p class="text-[10px] text-slate-500 mt-1">3 a 24 letras o números, sin espacios ni acentos.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-slate-300 font-semibold mb-1.5">Contraseña (4 a 32 caracteres)</label>
+                                    <div class="relative">
+                                        <input type="password" id="staff-pin" maxlength="32" autocomplete="new-password" placeholder="Obligatoria al registrar" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 pr-11 text-sm text-white focus:outline-none focus:border-amber-500">
+                                        <button type="button" onclick="toggleStaffPinInput()" class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg text-slate-400 hover:text-amber-400" title="Mostrar / ocultar"><i class="fa-solid fa-eye" id="staff-pin-eye"></i></button>
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 mt-1">Al editar, déjala igual para conservarla o escribe una nueva.</p>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-slate-300 font-semibold mb-1">Estado</label>
-                                <select id="staff-status" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500">
-                                    <option value="active">🟢 Activa (Puede atender mesas)</option>
-                                    <option value="inactive">🔴 Inactiva (Descanso / Baja)</option>
-                                </select>
-                            </div>
-                            <div class="flex gap-2 pt-2">
-                                <button type="submit" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl transition-all shadow-md">
-                                    Guardar Mesera
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl transition-all shadow-md text-sm">
+                                    <i class="fa-solid fa-floppy-disk mr-1"></i> Guardar
                                 </button>
-                                <button type="button" onclick="resetStaffForm()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl">
+                                <button type="button" onclick="resetStaffForm()" class="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl">
                                     Limpiar
                                 </button>
                             </div>
@@ -709,7 +756,10 @@
                     </div>
 
                     <div class="lg:col-span-8 space-y-4">
-                        <h3 class="font-bold text-white text-base">Equipo de Servicio (Meseras)</h3>
+                        <div class="flex items-center justify-between gap-3">
+                            <h3 class="font-bold text-white text-base flex items-center gap-2"><i class="fa-solid fa-people-group text-amber-400"></i> Equipo de Servicio</h3>
+                            <span id="staff-count" class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[11px] font-bold"></span>
+                        </div>
                         <div id="staff-cards-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         </div>
                     </div>
@@ -768,16 +818,19 @@
                             <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
                                 <label class="block text-slate-300 font-semibold">Fotografía del Producto</label>
                                 
-                                <div class="flex items-center gap-3">
-                                    <div class="w-24 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0" style="aspect-ratio:3/2">
-                                        <img id="catalog-img-preview" src="" alt="Vista previa" class="w-full h-full dish-fit dish-thumb hidden" style="height:100% !important">
-                                        <i id="catalog-img-placeholder" class="fa-regular fa-image text-slate-500 text-xl"></i>
+                                <div class="flex flex-col sm:flex-row items-stretch gap-3">
+                                    <div class="w-full sm:w-36 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden shrink-0 relative" style="aspect-ratio:3/2">
+                                        <img id="catalog-img-preview" src="" alt="Vista previa" class="hidden" style="width:100%;height:100%;object-fit:contain;background:#0b1220">
+                                        <div id="catalog-img-placeholder" class="text-center text-slate-500"><i class="fa-regular fa-image text-2xl"></i><p class="text-[10px] mt-1">Sin foto</p></div>
                                     </div>
-                                    <div class="flex-1 space-y-1.5">
-                                        <label class="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg text-[11px] transition-all">
-                                            <i class="fa-solid fa-upload"></i> Subir Foto Local
-                                            <input type="file" accept="image/*" onchange="handleProductFileUpload(event)" class="hidden">
-                                        </label>
+                                    <div class="flex-1 space-y-2 min-w-0">
+                                        <div class="flex flex-wrap gap-2">
+                                            <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-xs transition-all">
+                                                <i class="fa-solid fa-camera"></i> Subir / tomar foto
+                                                <input type="file" accept="image/*" onchange="handleProductFileUpload(event)" class="hidden">
+                                            </label>
+                                            <button type="button" id="catalog-img-remove" onclick="removeCatalogPhoto()" class="hidden px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold rounded-xl text-xs"><i class="fa-solid fa-trash-can"></i> Quitar</button>
+                                        </div>
                                         <input type="text" id="catalog-image-url" oninput="updateCatalogImagePreview(this.value)" placeholder="O pega una URL de imagen..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-[11px] text-slate-200 focus:outline-none">
                                     </div>
                                 </div>
@@ -805,7 +858,8 @@
                         <div class="px-4 py-2.5 border-b border-slate-800">
                             <input type="search" id="catalog-search" oninput="renderAdminCatalog()" placeholder="Buscar platillo o categoría..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-orange-500">
                         </div>
-                        <div class="overflow-x-auto max-h-[540px]">
+                        <div id="catalog-cards-mobile" class="sm:hidden p-3 grid grid-cols-1 gap-3"></div>
+                        <div class="hidden sm:block overflow-x-auto max-h-[540px]">
                             <table class="w-full text-left text-xs">
                                 <thead class="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800 sticky top-0">
                                     <tr>
@@ -846,9 +900,6 @@
                                     <i class="fa-solid fa-file-arrow-down text-sm"></i> PDF ESTA MESA
                                 </button>
 
-                                <button onclick="downloadAllTablesPDF()" id="btn-download-all-pdf" class="px-4 py-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center gap-2">
-                                    <i class="fa-solid fa-layer-group text-sm"></i> PDF TODAS LAS MESAS
-                                </button>
                             </div>
                         </div>
 
@@ -891,15 +942,9 @@
                     </div>
 
                     <!-- HOJA IMPRIMIBLE / EXPORTABLE A PDF -->
-                    <div id="pdf-export-container" class="bg-white text-slate-900 rounded-3xl p-8 max-w-4xl mx-auto shadow-2xl space-y-8">
-                        
-                        <!-- MENÚ IMPRIMIBLE (sin QR de productos) -->
-                        <div id="printable-menu-sheet" class="space-y-5"></div>
-
-                        <div class="html2pdf__page-break"></div>
-
-                        <!-- CONTENEDOR DINÁMICO DE HOJAS DE QR DE MESA -->
-                        <div id="print-tables-pages-wrapper" class="space-y-8"></div>
+                    <div id="pdf-export-container" class="mx-auto rounded-3xl p-3 sm:p-5" style="background:#0b1220;border:1px solid #1e293b;max-width:1180px">
+                        <div id="pdf-pages-summary" class="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-slate-300"></div>
+                        <div id="pdf-pages-grid"></div>
                     </div>
                 </div>
 
@@ -2315,7 +2360,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                                 <span class="text-3xl font-black text-amber-400">${kitchenNumLabel(k.n)}</span>
                                 <span class="text-xl font-black text-white">${escapeHtmlText(t.name)}</span>
                             </div>
-                            <p class="text-[11px] text-slate-400 font-semibold">${escapeHtmlText(k.waiter || t.waiter || '')}${t.guests ? ' · ' + t.guests + ' pers.' : ''} · Ronda ${k.round || 1} · ${hora}${kitchenTimingText(k)}</p>
+                            <p class="text-[11px] text-slate-400 font-semibold">${staffAvatarHtml(k.waiter || t.waiter, 26, true)}${escapeHtmlText(k.waiter || t.waiter || '')}${t.guests ? ' · ' + t.guests + ' pers.' : ''} · Ronda ${k.round || 1} · ${hora}${kitchenTimingText(k)}</p>
                         </div>
                         <span class="px-2 py-1 rounded-lg text-xs font-black whitespace-nowrap ${timeCls}"><i class="fa-regular fa-clock mr-1"></i>${mins} min</span>
                     </div>
@@ -3719,7 +3764,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 if (currentWaitressSession) {
                     const st = staff.find(s => s.name === currentWaitressSession);
                     document.getElementById('waitress-session-name').textContent = currentWaitressSession;
-                    document.getElementById('waitress-session-shift').textContent = st ? st.shift : '';
+                    document.getElementById('waitress-session-shift').textContent = st ? (st.role || 'Mesera') : '';
+                    const _av = document.getElementById('waitress-session-avatar'); if (_av) _av.innerHTML = staffAvatarHtml(currentWaitressSession, 44);
                     loginBox.classList.add('hidden');
                     sessBox.classList.remove('hidden');
                 } else {
@@ -3968,34 +4014,27 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         // --- DESCARGAR PDF (UNA MESA O TODAS LAS MESAS) ---
         async function downloadSingleTablePDF() {
             printAllTablesMode = false;
-            renderPrintableSheet();
-            await new Promise(resolve => setTimeout(resolve, 180));
-
             const tableId = parseInt(document.getElementById('print-selected-table-select').value) || tables[0]?.id;
             const table = tables.find(t => t.id === tableId) || tables[0];
             const safeName = (storeConfig.businessName || 'Menu_QR').replace(/[^a-zA-Z0-9_-]/g, '_');
             const fileName = `${safeName}_${table ? table.code : 'MESA-1'}.pdf`;
 
-            await generatePDFFile(document.getElementById('pdf-export-container'), document.getElementById('btn-download-single-pdf'), fileName);
-        }
-
-        async function downloadAllTablesPDF() {
-            if (tables.length === 0) {
-                showToast('No hay mesas registradas para exportar', 'warning');
-                return;
+            // Hojas a tamaño real (carta) fuera de pantalla, una tras otra con salto de página
+            const data = buildPrintPages();
+            const total = data.pages.length;
+            const host = document.createElement('div');
+            host.style.cssText = 'position:fixed;left:-20000px;top:0;width:816px;background:#fff';
+            host.innerHTML = data.pages.map((c, i) => wrapPdfPage(c, i + 1, total) + (i < total - 1 ? '<div class="html2pdf__page-break"></div>' : '')).join('');
+            document.body.appendChild(host);
+            fillPdfQrs(host);
+            // esperar a que carguen las imágenes
+            await Promise.all(Array.from(host.querySelectorAll('img')).map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; setTimeout(r, 4000); })));
+            await new Promise(r => setTimeout(r, 200));
+            try {
+                await generatePDFFile(host, document.getElementById('btn-download-single-pdf'), fileName, { margin: [0, 0, 0, 0], pagebreak: { mode: ['css', 'legacy'] } });
+            } finally {
+                host.remove();
             }
-
-            printAllTablesMode = true;
-            renderPrintableSheet();
-            await new Promise(resolve => setTimeout(resolve, 250));
-
-            const safeName = (storeConfig.businessName || 'Menu_QR').replace(/[^a-zA-Z0-9_-]/g, '_');
-            const fileName = `${safeName}_Todas_Las_Mesas.pdf`;
-
-            await generatePDFFile(document.getElementById('pdf-export-container'), document.getElementById('btn-download-all-pdf'), fileName);
-
-            printAllTablesMode = false;
-            renderPrintableSheet();
         }
 
         async function generatePDFFile(element, btn, fileName, optOverride = null) {
@@ -6055,7 +6094,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const chairs = Array.from({ length: seats }, (_, ci) => `<span class="mesa-chair ${ci < filled ? 'on' : ''}" style="transform:translate(-50%,-50%) rotate(${(ci * 360 / seats).toFixed(1)}deg) translateY(-62px)"></span>`).join('');
                 const alertCls = (table.calling || tableKitchenState(table) === 'ready') ? 'mesa-alert' : '';
                 card.innerHTML = `
-                    <p class="text-center text-sm font-black truncate mb-1 ${table.waiter && table.status !== 'free' ? 'text-orange-400' : 'text-slate-600'}"><i class="fa-solid fa-user-tie mr-1"></i>${table.status !== 'free' && table.waiter ? escapeHtmlText(table.waiter) : 'Sin mesera'}</p>
+                    <p class="flex items-center justify-center gap-1.5 text-sm font-black mb-1 ${table.waiter && table.status !== 'free' ? 'text-orange-400' : 'text-slate-600'}">${table.status !== 'free' && table.waiter ? staffAvatarHtml(table.waiter, 26) + '<span class="truncate">' + escapeHtmlText(table.waiter) + '</span>' : '<i class="fa-solid fa-user-tie mr-1"></i>Sin mesera'}</p>
                     <div class="mesa-viz ${alertCls}">
                         ${chairs}
                         <div class="mesa-top"><span class="mesa-name">${table.name}</span><span class="mesa-amt">${table.status === 'free' ? 'Libre' : '$' + total.toFixed(0)}</span></div>
@@ -6191,8 +6230,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             e.preventDefault();
             const id = document.getElementById('staff-id').value;
             const name = document.getElementById('staff-name').value.trim();
-            const shift = document.getElementById('staff-shift').value;
-            const status = document.getElementById('staff-status').value;
+            const shift = '';
+            const status = 'active';
             const role = document.getElementById('staff-role').value === 'Mesero' ? 'Mesero' : 'Mesera';
             const pin = document.getElementById('staff-pin').value;
             const user = normStaffUser(document.getElementById('staff-user').value);
@@ -6218,12 +6257,12 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (existing) {
                 const oldName = existing.name;
                 existing.name = name;
-                existing.shift = shift;
-                existing.status = status;
+                existing.status = 'active';
+                if (staffPhotoDraft) existing.photo = staffPhotoDraft; else delete existing.photo;
                 existing.role = role;
                 if (normStaffUser(existing.user) !== user) clearFailedAttempts('wu-' + normStaffUser(existing.user));
                 existing.user = user;
-                if (pinFields) { Object.assign(existing, pinFields); clearFailedAttempts('wu-' + user); }
+                if (pinFields) { Object.assign(existing, pinFields); clearFailedAttempts('wu-' + user); setStaffPw(existing.id, pin); }
                 if (oldName !== name) {
                     tables.forEach(t => { if (t.waiter === oldName) t.waiter = name; });
                     if (currentWaitressSession === oldName) {
@@ -6233,15 +6272,17 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 }
                 showToast(`Mesera ${name} actualizada${pinFields ? ' (contraseña nueva guardada)' : ''}`, 'success');
             } else {
+                const newId = Date.now();
+                if (pin) setStaffPw(newId, pin);
                 staff.push({
-                    id: Date.now(),
+                    id: newId,
                     name,
-                    shift,
                     status,
                     role,
                     user,
                     salesCount: 0,
                     salesTotal: 0,
+                    ...(staffPhotoDraft ? { photo: staffPhotoDraft } : {}),
                     ...pinFields
                 });
                 showToast(`¡Mesera ${name} registrada! Usuario: ${user}`, 'success');
@@ -6277,6 +6318,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
 
             staff = staff.filter(s => s.id != id);
+            delStaffPw(id);
             saveData();
             renderAdminStaff();
             populateWaitressSessionSelect();
@@ -6288,16 +6330,111 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (!st) return;
             document.getElementById('staff-id').value = st.id;
             document.getElementById('staff-name').value = st.name;
-            document.getElementById('staff-shift').value = st.shift;
-            document.getElementById('staff-status').value = st.status;
             document.getElementById('staff-role').value = st.role === 'Mesero' ? 'Mesero' : 'Mesera';
-            document.getElementById('staff-pin').value = '';
+            document.getElementById('staff-pin').value = getStaffPw(st.id);
             document.getElementById('staff-user').value = st.user || '';
+            staffPhotoDraft = st.photo || ''; updateStaffPhotoPreview();
+            const ft = document.getElementById('staff-form-title'); if (ft) ft.textContent = 'Editar ' + (st.role === 'Mesero' ? 'Mesero' : 'Mesera');
+            const fc = document.getElementById('staff-form-card'); if (fc) fc.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function resetStaffForm() {
             document.getElementById('staff-form').reset();
             document.getElementById('staff-id').value = '';
+            staffPhotoDraft = ''; updateStaffPhotoPreview();
+            const ft = document.getElementById('staff-form-title'); if (ft) ft.textContent = 'Registrar Mesera o Mesero';
+            const pi = document.getElementById('staff-pin'); if (pi) pi.type = 'password';
+            const ey = document.getElementById('staff-pin-eye'); if (ey) ey.className = 'fa-solid fa-eye';
+        }
+
+        // --- Foto de perfil del personal ---
+        let staffPhotoDraft = '';
+        function handleStaffPhotoUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!/^image\//.test(file.type)) { showToast('Elige un archivo de imagen', 'warning'); return; }
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const S = 192; // cuadrada y ligera para que la sincronización no pese
+                const c = document.createElement('canvas'); c.width = c.height = S;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, S, S);
+                const m = Math.min(img.width, img.height);
+                const sx = (img.width - m) / 2, sy = (img.height - m) * 0.3; // recorte centrado, un poco hacia arriba (caras)
+                ctx.drawImage(img, sx, sy, m, m, 0, 0, S, S);
+                URL.revokeObjectURL(url);
+                staffPhotoDraft = c.toDataURL('image/jpeg', 0.8);
+                updateStaffPhotoPreview();
+                showToast('Foto lista. Presiona Guardar para aplicarla', 'success');
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); showToast('No se pudo leer la imagen. Prueba con otra (JPG o PNG)', 'error'); };
+            img.src = url;
+            try { e.target.value = ''; } catch (err) {}
+        }
+        function removeStaffPhoto() { staffPhotoDraft = ''; updateStaffPhotoPreview(); }
+        function updateStaffPhotoPreview() {
+            const box = document.getElementById('staff-photo-box');
+            if (!box) return;
+            const roleSel = document.getElementById('staff-role');
+            const src = staffPhotoDraft || defaultStaffAvatarUri(roleSel && roleSel.value);
+            box.innerHTML = `<img src="${src}" alt="" style="width:100%;height:100%;object-fit:cover">`;
+            const rm = document.getElementById('staff-photo-remove');
+            if (rm) rm.classList.toggle('hidden', !staffPhotoDraft);
+        }
+        // Avatar por defecto cuando no hay foto: mujer para "Mesera", hombre para "Mesero"
+        const _staffDefAv = {};
+        function defaultStaffAvatarUri(role) {
+            const male = role === 'Mesero';
+            const key = male ? 'm' : 'f';
+            if (_staffDefAv[key]) return _staffDefAv[key];
+            const skin = '#f6d0a8', neck = '#e8b98a';
+            const svg = male
+                ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#7dd3fc"/><path d="M8 64Q8 47 32 47Q56 47 56 64Z" fill="#1e3a8a"/><path d="M27 47L32 55L37 47Z" fill="#fff"/><rect x="28" y="38" width="8" height="10" rx="3" fill="${neck}"/><ellipse cx="32" cy="29" rx="11" ry="13" fill="${skin}"/><ellipse cx="21.3" cy="30" rx="2" ry="3" fill="${skin}"/><ellipse cx="42.7" cy="30" rx="2" ry="3" fill="${skin}"/><path d="M20.5 28Q18.5 12 32 12Q45.5 12 43.5 28Q41 19.5 32 19.5Q23 19.5 20.5 28Z" fill="#2b1b12"/><circle cx="27.5" cy="30" r="1.3" fill="#2b1b12"/><circle cx="36.5" cy="30" r="1.3" fill="#2b1b12"/><path d="M28.5 36Q32 38.5 35.5 36" stroke="#9a5b3c" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>`
+                : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#fdba74"/><path d="M16 56Q14 12 32 11Q50 12 48 56Z" fill="#3b2314"/><path d="M8 64Q8 47 32 47Q56 47 56 64Z" fill="#be123c"/><rect x="28" y="38" width="8" height="10" rx="3" fill="${neck}"/><ellipse cx="32" cy="29" rx="11" ry="13" fill="${skin}"/><path d="M20.5 28Q21 14 32 14Q43 14 43.5 28Q40 20 32 20Q24 20 20.5 28Z" fill="#3b2314"/><circle cx="27.5" cy="30" r="1.3" fill="#3b2314"/><circle cx="36.5" cy="30" r="1.3" fill="#3b2314"/><path d="M28.5 36Q32 39 35.5 36" stroke="#c2410c" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`;
+            return (_staffDefAv[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+        }
+        // Avatar redondo del mesero (foto o inicial). Se usa en admin, mesero, cocina y cliente.
+        function staffAvatarHtml(name, size, inline) {
+            if (!name || name === 'Para llevar') return '';
+            const st = (typeof staff !== 'undefined' && staff) ? staff.find(x => x.name === name) : null;
+            const sz = size || 28;
+            const cls = inline ? ' sav-inline' : '';
+            if (st && st.photo) return `<img src="${escAttr(st.photo)}" alt="" class="staff-av-img${cls}" style="width:${sz}px;height:${sz}px">`;
+            if (st) return `<img src="${defaultStaffAvatarUri(st.role)}" alt="" class="staff-av-img${cls}" style="width:${sz}px;height:${sz}px">`;
+            const ini = escapeHtmlText(((name || '?').trim().charAt(0) || '?').toUpperCase());
+            return `<span class="staff-av-ini${cls}" style="width:${sz}px;height:${sz}px;font-size:${Math.round(sz * 0.45)}px">${ini}</span>`;
+        }
+
+        // Copia visible de la contraseña: solo vive en ESTE dispositivo (no se sube a la nube ni llega a meseras/clientes)
+        const STAFF_PW_KEY = 'pargo_admin_staff_pw_v1';
+        function _pwStore() { try { return JSON.parse(localStorage.getItem(STAFF_PW_KEY) || '{}') || {}; } catch (e) { return {}; } }
+        function getStaffPw(id) { return _pwStore()[id] || ''; }
+        function setStaffPw(id, pw) { try { const o = _pwStore(); o[id] = pw; localStorage.setItem(STAFF_PW_KEY, JSON.stringify(o)); } catch (e) {} }
+        function delStaffPw(id) { try { const o = _pwStore(); delete o[id]; localStorage.setItem(STAFF_PW_KEY, JSON.stringify(o)); } catch (e) {} }
+        function toggleStaffPinInput() {
+            const i = document.getElementById('staff-pin'), e = document.getElementById('staff-pin-eye');
+            const show = i.type === 'password';
+            i.type = show ? 'text' : 'password';
+            if (e) e.className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+        }
+        function toggleStaffPwView(id) {
+            const el = document.getElementById('stf-pw-' + id), ic = document.getElementById('stf-eye-' + id);
+            if (!el) return;
+            const pw = getStaffPw(id);
+            if (!pw) return;
+            const shown = el.dataset.shown === '1';
+            el.textContent = shown ? '••••••' : pw;
+            el.dataset.shown = shown ? '0' : '1';
+            if (ic) ic.className = shown ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+        }
+        function copyStaffValue(id, what) {
+            const st = staff.find(x => x.id == id); if (!st) return;
+            const txt = what === 'pw' ? getStaffPw(id) : (st.user || '');
+            if (!txt) return;
+            const done = () => showToast((what === 'pw' ? 'Contraseña' : 'Usuario') + ' copiado', 'success');
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => showToast('No se pudo copiar', 'error'));
+            else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch (e) {} t.remove(); }
         }
 
         // PIN olvidado: los PIN se guardan cifrados (no se pueden leer), así que se genera uno nuevo y se muestra una sola vez
@@ -6312,6 +6449,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const salt = randomSaltHex();
             st.pinSalt = salt; st.pinHash = await hashPin(pin, salt, PBKDF2_ITER); st.pinIter = PBKDF2_ITER;
             clearFailedAttempts('w' + st.id); clearFailedAttempts('wu-' + normStaffUser(st.user));
+            setStaffPw(st.id, pin);
             saveData(true);
             renderAdminStaff();
             populateWaitressSessionSelect();
@@ -6321,7 +6459,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Contraseña nueva de</p>
                 <p class="text-lg font-black text-white">${escapeHtmlText(st.name)}</p>
                 <p class="text-5xl font-black tracking-[0.3em] text-amber-400 py-2">${pin}</p>
-                <p class="text-[11px] text-slate-400 leading-snug">Usuario: <b class="text-white">${escapeHtmlText(st.user || '')}</b><br>Anótala o díselo ahora. Por seguridad no se puede volver a ver; si la olvida otra vez, genera una nueva.</p>
+                <p class="text-[11px] text-slate-400 leading-snug">Usuario: <b class="text-white">${escapeHtmlText(st.user || '')}</b><br>Ya queda guardada: la puedes volver a ver en la tarjeta de la mesera (ojito).</p>
                 <button type="button" class="w-full py-3 rounded-xl text-slate-950 font-black text-sm" style="background:linear-gradient(135deg,#fb923c,#fbbf24);">Listo, ya lo anoté</button>
             </div>`;
             ov.querySelector('button').onclick = () => ov.remove();
@@ -6331,43 +6469,45 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         function renderAdminStaff() {
             const container = document.getElementById('staff-cards-list');
             container.innerHTML = '';
+            const cnt = document.getElementById('staff-count');
+            if (cnt) cnt.textContent = staff.length + (staff.length === 1 ? ' persona' : ' personas');
+            if (!staff.length) { container.innerHTML = '<div class="stf-empty"><i class="fa-solid fa-user-plus text-2xl mb-2 block"></i>Aún no hay meseras registradas.<br>Agrega la primera con el formulario.</div>'; return; }
 
             staff.forEach(st => {
                 const card = document.createElement('div');
-                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-md";
-                const isOn = st.status === 'active';
+                card.className = 'stf-card';
+                const pw = getStaffPw(st.id);
+                const hasPin = !!(st.pinHash && st.pinSalt);
+                const initial = escapeHtmlText(((st.name || '?').trim().charAt(0) || '?').toUpperCase());
+                const pwRow = pw
+                    ? `<b class="stf-val stf-pw" id="stf-pw-${st.id}" data-shown="0">••••••</b>
+                       <button type="button" onclick="toggleStaffPwView(${st.id})" class="stf-mini" title="Ver / ocultar"><i class="fa-solid fa-eye" id="stf-eye-${st.id}"></i></button>
+                       <button type="button" onclick="copyStaffValue(${st.id},'pw')" class="stf-mini" title="Copiar contraseña"><i class="fa-regular fa-copy"></i></button>`
+                    : `<span class="stf-val stf-pw off">${hasPin ? 'No visible aquí · pulsa “Nueva contraseña”' : '⚠️ Sin contraseña'}</span>`;
 
                 card.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl ${isOn ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-500'} flex items-center justify-center font-bold">
-                            <i class="fa-solid fa-user-tie"></i>
-                        </div>
-                        <div>
-                            <h5 class="font-bold text-white text-xs">${st.name}</h5>
-                            <p class="text-[10px] text-slate-400">${st.role ? st.role + ' · ' : ''}${st.shift}</p>
-                            <p class="text-[10px] text-slate-300"><i class="fa-solid fa-user text-slate-500 mr-1"></i>Usuario: <b>${escAttr(st.user || '—')}</b></p>
-                            <span class="inline-block mt-0.5 px-2 py-0.5 rounded text-[9px] font-bold ${isOn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
-                                ${isOn ? '🟢 Activa' : '🔴 Inactiva'}
-                            </span>
-                            <span class="inline-block mt-0.5 ml-1 px-2 py-0.5 rounded text-[9px] font-bold ${st.pinHash ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-300'}">
-                                ${st.pinHash ? '🔒 Contraseña asignada' : '⚠️ Sin contraseña'}
-                            </span>
+                    <div class="stf-top">
+                        <img src="${st.photo ? escAttr(st.photo) : defaultStaffAvatarUri(st.role)}" alt="" class="stf-av" style="object-fit:cover;padding:0;background:#0b1220;border:2px solid rgba(251,191,36,.6)">
+                        <div class="min-w-0">
+                            <div class="stf-name">${escapeHtmlText(st.name)}</div>
+                            <span class="stf-role">${escapeHtmlText(st.role || 'Mesera')}</span>
                         </div>
                     </div>
-
-                    <div class="flex items-center gap-1.5">
-                        <button onclick="toggleStaffStatus(${st.id})" class="p-2 bg-slate-800 rounded-xl text-xs ${isOn ? 'text-emerald-400' : 'text-rose-400'}" title="Activar / Desactivar">
-                            <i class="fa-solid fa-power-off"></i>
-                        </button>
-                        <button onclick="resetStaffPin(${st.id})" class="p-2 bg-slate-800 text-sky-300 rounded-xl text-xs" title="Nueva contraseña (si la olvidó)">
-                            <i class="fa-solid fa-key"></i>
-                        </button>
-                        <button onclick="editStaffAdmin(${st.id})" class="p-2 bg-slate-800 text-amber-400 rounded-xl text-xs" title="Editar">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                        <button onclick="deleteStaffAdmin(${st.id})" class="p-2 bg-slate-800 text-rose-400 rounded-xl text-xs" title="Quitar Personal">
-                            <i class="fa-solid fa-user-minus"></i>
-                        </button>
+                    <div class="stf-rows">
+                        <div class="stf-row">
+                            <span class="stf-lbl"><i class="fa-solid fa-user"></i> Usuario</span>
+                            <b class="stf-val">${escapeHtmlText(st.user || '—')}</b>
+                            ${st.user ? `<button type="button" onclick="copyStaffValue(${st.id},'user')" class="stf-mini" title="Copiar usuario"><i class="fa-regular fa-copy"></i></button>` : ''}
+                        </div>
+                        <div class="stf-row">
+                            <span class="stf-lbl"><i class="fa-solid fa-lock"></i> Contraseña</span>
+                            ${pwRow}
+                        </div>
+                    </div>
+                    <div class="stf-actions">
+                        <button type="button" onclick="editStaffAdmin(${st.id})" class="stf-btn amber"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
+                        <button type="button" onclick="resetStaffPin(${st.id})" class="stf-btn" title="Genera una contraseña nueva si la olvidó"><i class="fa-solid fa-key"></i> Nueva contraseña</button>
+                        <button type="button" onclick="deleteStaffAdmin(${st.id})" class="stf-btn red" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -6384,7 +6524,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const url = URL.createObjectURL(file);
             const img = new Image();
             img.onload = () => {
-                const MAXS = 800;
+                const MAXS = 700;
                 const k = Math.min(1, MAXS / Math.max(img.width, img.height));
                 const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
                 const c = document.createElement('canvas');
@@ -6394,25 +6534,38 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 ctx.fillRect(0, 0, w, h);
                 ctx.drawImage(img, 0, 0, w, h);
                 URL.revokeObjectURL(url);
-                uploadedBase64Photo = c.toDataURL('image/jpeg', 0.82);
+                uploadedBase64Photo = c.toDataURL('image/jpeg', 0.78);
+                document.getElementById('catalog-image-url').value = '';
                 updateCatalogImagePreview(uploadedBase64Photo);
                 showToast('Foto cargada y ajustada', 'success');
             };
-            img.onerror = () => { URL.revokeObjectURL(url); showToast('No se pudo leer la imagen', 'error'); };
+            img.onerror = () => { URL.revokeObjectURL(url); showToast('No se pudo leer la imagen. Prueba con otra foto (JPG o PNG)', 'error'); };
             img.src = url;
+            try { e.target.value = ''; } catch (err) {}
+        }
+
+        function removeCatalogPhoto() {
+            uploadedBase64Photo = '';
+            const u = document.getElementById('catalog-image-url'); if (u) u.value = '';
+            updateCatalogImagePreview('');
         }
 
         function updateCatalogImagePreview(url) {
             const img = document.getElementById('catalog-img-preview');
             const placeholder = document.getElementById('catalog-img-placeholder');
 
+            const rm = document.getElementById('catalog-img-remove');
             if (url) {
+                img.onerror = () => { img.classList.add('hidden'); placeholder.classList.remove('hidden'); };
                 img.src = url;
                 img.classList.remove('hidden');
                 placeholder.classList.add('hidden');
+                if (rm) rm.classList.remove('hidden');
             } else {
+                img.removeAttribute('src');
                 img.classList.add('hidden');
                 placeholder.classList.remove('hidden');
+                if (rm) rm.classList.add('hidden');
             }
         }
 
@@ -6548,12 +6701,15 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const tbody = document.getElementById('catalog-table-body');
             document.getElementById('catalog-count').textContent = catalog.length;
             tbody.innerHTML = '';
+            const cards = document.getElementById('catalog-cards-mobile');
+            if (cards) cards.innerHTML = '';
 
             const q = ((document.getElementById('catalog-search') || {}).value || '').trim().toLowerCase();
             const _sortedCat = catalogByNumber();
             const shown = q ? _sortedCat.filter(p => (p.name + ' ' + menuCategoryLabel(p.category) + ' ' + (p.desc || '')).toLowerCase().includes(q) || String(dishNum(p)) === q) : _sortedCat;
             if (q && shown.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">No se encontró ningún platillo con ese nombre.</td></tr>';
+                if (cards) cards.innerHTML = '<p class="p-6 text-center text-slate-500 text-xs">No se encontró ningún platillo con ese nombre.</p>';
                 return;
             }
 
@@ -6589,6 +6745,26 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     </td>
                 `;
                 tbody.appendChild(tr);
+
+                if (cards) {
+                    const cd = document.createElement('div');
+                    cd.className = 'flex gap-3 bg-slate-950/60 border border-slate-800 rounded-2xl p-2.5';
+                    cd.innerHTML = `
+                        <img src="${escapeHtmlText(prod.image || menuIcon(prod.category))}" alt="" loading="lazy" class="rounded-xl shrink-0 ${available ? '' : 'grayscale opacity-60'}" style="width:104px;height:84px;object-fit:cover;background:#0b1220" onerror="this.onerror=null;this.src=menuIcon('${escapeHtmlText(prod.category)}')">
+                        <div class="flex-1 min-w-0 flex flex-col justify-between gap-1.5">
+                            <div class="min-w-0">
+                                <div class="font-bold text-white text-[13px] leading-tight">${dishBadge(dishNum(prod))}${escapeHtmlText(prod.name)}</div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">${menuCategoryLabel(prod.category)}</div>
+                                <div class="font-black text-emerald-400 text-sm mt-0.5">$${prod.price.toFixed(2)}</div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="toggleCatalogAvailability(${prod.id})" class="flex-1 px-2 py-2 rounded-lg text-[10px] font-extrabold border ${available ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'}">${available ? '🟢 Disponible' : '🔴 Agotado'}</button>
+                                <button onclick="editCatalogAdmin(${prod.id})" class="w-9 h-9 rounded-lg bg-slate-800 text-amber-400 text-sm" title="Modificar"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button onclick="deleteCatalogAdmin(${prod.id})" class="w-9 h-9 rounded-lg bg-slate-800 text-rose-400 text-sm" title="Quitar del menú"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </div>`;
+                    cards.appendChild(cd);
+                }
             });
         }
 
@@ -6606,108 +6782,143 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
         }
 
-        function renderPrintableMenu(restName) {
-            const sheet = document.getElementById('printable-menu-sheet');
-            if (!sheet) return;
+        function renderPrintableMenu() { renderPrintableSheet(); }
 
-            const categories = MENU_CATEGORIES;
+        // Arma las hojas (tamaño carta) del menú + las hojas de QR. Devuelve el HTML interno de cada hoja.
+        function buildPrintPages() {
+            const restName = escapeHtmlText((storeConfig.businessName || 'Marisquería Pargo').toUpperCase());
+            let m = document.getElementById('pdf-measure');
+            if (!m) {
+                m = document.createElement('div');
+                m.id = 'pdf-measure';
+                m.style.cssText = 'position:absolute;left:-99999px;top:0;width:736px;visibility:hidden;pointer-events:none';
+                document.body.appendChild(m);
+            }
+            const meas = html => { m.innerHTML = html; return m.offsetHeight; };
+            const CAP = 974; // alto útil de cada hoja (sin pie de página)
+            const pages = [];
+            let cur = [], curH = 0;
+            const push = (h, hh) => { cur.push(h); curH += hh; };
+            const newPage = () => { if (cur.length) pages.push(cur.join('')); cur = []; curH = 0; };
 
-            const sections = categories.map(cat => {
-                const items = catalog.filter(p => p.category === cat.key);
-                if (items.length === 0) return '';
-                return `
-                    <div class="space-y-2" style="break-inside: avoid; page-break-inside: avoid;">
-                        <h3 class="text-sm font-black text-orange-600 uppercase tracking-widest border-b border-slate-300 pb-1">${cat.label}</h3>
-                        <div class="grid grid-cols-2 gap-3">
-                            ${items.map(prod => `
-                                <div class="flex items-center gap-3 border border-slate-200 rounded-xl p-2 bg-white" style="break-inside: avoid; page-break-inside: avoid;">
-                                    <img src="${prod.image}" crossorigin="anonymous" class="rounded-lg shrink-0" style="width:108px;height:72px;object-fit:cover;background:#f1f5f9;" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
-                                    <div class="min-w-0 flex-1">
-                                        <h4 class="font-extrabold text-slate-900 text-xs leading-tight">${dishBadgePrint(dishNum(prod))}${prod.name}</h4>
-                                        ${prod.desc ? `<p class="text-[10px] text-slate-500 leading-tight mt-0.5">${prod.desc}</p>` : ''}
-                                        <p class="text-sm font-black text-orange-600 mt-1">$${prod.price.toFixed(2)}</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            sheet.innerHTML = `
+            const brand = document.getElementById('brand-logo');
+            const headerHtml = `
                 <div class="text-center border-b-2 border-orange-500 pb-4">
-                    <img src="${document.getElementById('brand-logo').src}" alt="" class="h-24 w-auto mx-auto mb-2">
+                    <img src="${brand ? brand.src : ''}" alt="" class="h-24 w-auto mx-auto mb-2">
                     <h2 class="text-2xl font-black text-slate-900 tracking-tight uppercase">${restName}</h2>
                     <p class="text-xs text-slate-600 font-semibold mt-1">Nuestro Menú · “Del mar a tu paladar”</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Pedidos y reservaciones: 744 294 0816 · 12:30 a 6:30 pm · Sin servicio los miércoles</p>
                     <p class="text-[11px] text-slate-500 mt-0.5">Aceptamos transferencia y efectivo · Ostiones frescos y pescado de piedra: solo en temporada · Tragos y copas: Whisky, Bacardí, Torres, Tequila, Ron y Mezcal</p>
-                </div>
-                ${sections || '<p class="text-center text-slate-400 text-xs py-6">Aún no hay platillos en el menú</p>'}
-            `;
-        }
+                </div>`;
+            push(headerHtml, meas(headerHtml));
 
-        function renderPrintableSheet() {
-            const pagesWrapper = document.getElementById('print-tables-pages-wrapper');
-            if (!pagesWrapper) return;
+            const headBlock = (label, cont) => `<div style="padding-top:18px"><h3 class="text-sm font-black text-orange-600 uppercase tracking-widest border-b border-slate-300 pb-1">${label}${cont ? ' <span style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:none;letter-spacing:0">(continúa)</span>' : ''}</h3></div>`;
+            const card = prod => `
+                <div class="flex items-center gap-3 border border-slate-200 rounded-xl p-2 bg-white">
+                    <img src="${escapeHtmlText(prod.image || menuIcon(prod.category))}" crossorigin="anonymous" class="rounded-lg shrink-0" style="width:108px;height:72px;object-fit:cover;background:#f1f5f9;" onerror="this.onerror=null;this.src=menuIcon('${prod.category}')">
+                    <div class="min-w-0 flex-1">
+                        <h4 class="font-extrabold text-slate-900 text-xs leading-tight">${dishBadgePrint(dishNum(prod))}${escapeHtmlText(prod.name)}</h4>
+                        ${prod.desc ? `<p class="text-[10px] text-slate-500 leading-tight mt-0.5">${escapeHtmlText(prod.desc)}</p>` : ''}
+                        <p class="text-sm font-black text-orange-600 mt-1">$${Number(prod.price).toFixed(2)}</p>
+                    </div>
+                </div>`;
+            const rowBlock = row => `<div style="padding-top:10px"><div class="grid grid-cols-2 gap-3">${row.map(card).join('')}</div></div>`;
 
-            pagesWrapper.innerHTML = '';
+            let any = false;
+            MENU_CATEGORIES.forEach(cat => {
+                const items = catalog.filter(p => p.category === cat.key);
+                if (!items.length) return;
+                any = true;
+                for (let i = 0; i < items.length; i += 2) {
+                    const rowHtml = rowBlock(items.slice(i, i + 2));
+                    const rh = meas(rowHtml);
+                    if (i === 0) {
+                        const head = headBlock(cat.label, false), hh = meas(head);
+                        if (curH + hh + rh > CAP) newPage();
+                        push(head, hh); push(rowHtml, rh);
+                    } else {
+                        if (curH + rh > CAP) {
+                            newPage();
+                            const head = headBlock(cat.label, true);
+                            push(head, meas(head));
+                        }
+                        push(rowHtml, rh);
+                    }
+                }
+            });
+            if (!any) push('<p class="text-center text-slate-400 text-xs py-6">Aún no hay platillos en el menú</p>', 40);
+            newPage();
+            const menuPages = pages.length;
 
-            const restName = (storeConfig.businessName || 'Marisquería Pargo').toUpperCase();
-
-            renderPrintableMenu(restName);
-
+            // Hojas de QR de mesa (una por mesa)
             const selectedId = parseInt(document.getElementById('print-selected-table-select')?.value) || tables[0]?.id;
             const tablesToRender = printAllTablesMode
                 ? tables
                 : [tables.find(t => t.id === selectedId) || tables[0]].filter(Boolean);
-
-            tablesToRender.forEach((table, idx) => {
-                const qrBoxId = `print-table-qr-${table.id}-${idx}`;
-                const qrPayload = buildTableCustomerUrl(table.code);
-                const sheetBlock = document.createElement('div');
-                sheetBlock.innerHTML = `
-                    ${idx > 0 ? '<div class="html2pdf__page-break my-6"></div>' : ''}
-                    <div class="border-4 border-slate-900 rounded-3xl p-8 bg-gradient-to-b from-amber-50/50 to-orange-50/30 text-center space-y-6 relative overflow-hidden">
+            tablesToRender.forEach(table => {
+                pages.push(`
+                    <div style="height:${CAP}px;display:flex;align-items:center;justify-content:center">
+                    <div class="border-4 border-slate-900 rounded-3xl p-8 bg-gradient-to-b from-amber-50/50 to-orange-50/30 text-center space-y-6 relative overflow-hidden" style="width:100%">
                         <div class="max-w-md mx-auto space-y-3">
                             <div class="w-16 h-16 rounded-2xl bg-orange-600 text-white mx-auto flex items-center justify-center text-3xl shadow-xl shadow-orange-600/30">
                                 <i class="fa-solid fa-qrcode"></i>
                             </div>
                             <p class="text-xs font-extrabold text-slate-500 uppercase tracking-widest print-table-brand-label">${restName}</p>
                             <h2 class="text-3xl font-black text-slate-900 tracking-tight">QR DE MESA Y CONSULTA DE CUENTA</h2>
-                            <p class="text-sm font-semibold text-orange-600 uppercase tracking-wider">${table.name.toUpperCase()} (${table.code})</p>
-                            <p class="text-slate-600 text-xs leading-relaxed">
-                                Escanea para ver lo que pediste, el total en vivo, llamar a la mesera y pagar la cuenta.
-                            </p>
+                            <p class="text-sm font-semibold text-orange-600 uppercase tracking-wider">${escapeHtmlText(table.name.toUpperCase())} (${escapeHtmlText(table.code)})</p>
+                            <p class="text-slate-600 text-xs leading-relaxed">Escanea para ver lo que pediste, el total en vivo, llamar a la mesera y pagar la cuenta.</p>
                         </div>
-
                         <div class="py-4 flex flex-col items-center justify-center">
-                            <div class="p-5 bg-white rounded-3xl shadow-2xl border-2 border-orange-200 inline-block" id="${qrBoxId}">
-                            </div>
-                            <p class="text-[11px] font-mono font-bold text-slate-500 mt-3 break-all max-w-md">${table.code}</p>
+                            <div class="p-5 bg-white rounded-3xl shadow-2xl border-2 border-orange-200 inline-block" data-qr="${escapeHtmlText(buildTableCustomerUrl(table.code))}"></div>
+                            <p class="text-[11px] font-mono font-bold text-slate-500 mt-3 break-all max-w-md">${escapeHtmlText(table.code)}</p>
                         </div>
-
                         <div class="pt-4 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2 text-xs text-slate-500 max-w-lg mx-auto">
                             ${getWifiFooterHtml()}
                         </div>
                     </div>
-                `;
-                pagesWrapper.appendChild(sheetBlock);
-
-                setTimeout(() => {
-                    const el = document.getElementById(qrBoxId);
-                    if (el && typeof QRCode !== 'undefined') {
-                        el.innerHTML = '';
-                        new QRCode(el, {
-                            text: qrPayload,
-                            width: 170,
-                            height: 170,
-                            colorDark: "#ea580c",
-                            colorLight: "#ffffff",
-                            correctLevel: QRCode.CorrectLevel.H
-                        });
-                    }
-                }, 40);
+                    </div>`);
             });
+            return { pages, menuPages, qrPages: pages.length - menuPages };
+        }
+
+        function wrapPdfPage(content, n, total) {
+            return `<div class="pdf-page">${content}<div class="pdf-page-foot">Hoja ${n} de ${total}</div></div>`;
+        }
+
+        function fillPdfQrs(root) {
+            if (typeof QRCode === 'undefined') return;
+            root.querySelectorAll('[data-qr]').forEach(el => {
+                el.innerHTML = '';
+                new QRCode(el, { text: el.getAttribute('data-qr'), width: 170, height: 170, colorDark: '#ea580c', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+            });
+        }
+
+        // Ajusta el tamaño de las hojas de la vista previa al ancho disponible
+        function fitPdfPages() {
+            const grid = document.getElementById('pdf-pages-grid');
+            if (!grid) return;
+            const slot = grid.querySelector('.pdf-slot');
+            if (!slot || !slot.clientWidth) return;
+            const sc = slot.clientWidth / 816;
+            grid.querySelectorAll('.pdf-slot-inner').forEach(el => { el.style.transform = `scale(${sc})`; });
+        }
+
+        function renderPrintableSheet() {
+            const grid = document.getElementById('pdf-pages-grid');
+            if (!grid) return;
+            const data = buildPrintPages();
+            const total = data.pages.length;
+            grid.innerHTML = data.pages.map((c, i) => `<div class="pdf-slot"><div class="pdf-slot-inner">${wrapPdfPage(c, i + 1, total)}</div></div>`).join('');
+            fillPdfQrs(grid);
+            const sum = document.getElementById('pdf-pages-summary');
+            if (sum) sum.innerHTML = `<span class="font-black text-white text-sm"><i class="fa-solid fa-file-lines text-orange-400 mr-1.5"></i>${total} ${total === 1 ? 'hoja' : 'hojas'} tamaño carta</span><span class="text-slate-400">${data.menuPages} de menú · ${data.qrPages} de QR de mesa</span>`;
+            fitPdfPages();
+            if (!window.__pdfFitBound) {
+                window.__pdfFitBound = true;
+                if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => fitPdfPages()).observe(grid);
+                window.addEventListener('resize', fitPdfPages);
+                if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { try { renderPrintableSheet(); } catch (e) {} });
+            }
         }
 
         // --- CORTE DE CAJA Y REPORTES ---
@@ -7449,7 +7660,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                         <div class="text-center space-y-0.5 pb-0.5">
                             <span class="px-3 py-0.5 bg-orange-500/20 text-orange-400 rounded-full text-xs font-bold border border-orange-500/30">${escapeHtmlText(t.name)}</span>
                             <h3 class="text-xs font-black text-white pt-0.5">Tu cuenta en vivo</h3>
-                            <p class="text-[10px] text-orange-400 font-semibold">${t.status === 'free' ? 'Mesa disponible' : 'Te atiende: ' + escapeHtmlText(t.waiter || '—')}</p>
+                            ${t.status === 'free' ? '<p class="text-[10px] text-orange-400 font-semibold">Mesa disponible</p>' : '<p class="text-[10px] text-orange-400 font-semibold flex items-center justify-center gap-1.5">' + staffAvatarHtml(t.waiter, 24) + 'Te atiende: ' + escapeHtmlText(t.waiter || '—') + '</p>'}
                         </div>
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lo que has pedido</p>
                         ${rows}
@@ -7628,7 +7839,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 <div class="text-center py-1 space-y-1">
                     <span class="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-xs font-bold border border-orange-500/30">${table.name}</span>
                     <h3 class="text-lg font-black text-white">Tu cuenta en vivo</h3>
-                    <p class="text-[10px] text-orange-400 font-semibold">${table.status === 'free' ? 'Mesa disponible' : `Te atiende: ${table.waiter}`}</p>
+                    ${table.status === 'free' ? '<p class="text-[10px] text-orange-400 font-semibold">Mesa disponible</p>' : `<div class="flex items-center justify-center gap-3 mx-auto mt-1 px-3.5 py-2 rounded-2xl bg-slate-900 border border-slate-800" style="max-width:280px">${staffAvatarHtml(table.waiter, 52)}<div class="text-left min-w-0"><p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Te atiende</p><p class="text-base font-black text-white truncate">${escapeHtmlText(table.waiter || '—')}</p></div></div>`}
                     <p class="text-[10px] font-bold ${cloudSyncStatus.state === 'ok' ? 'text-emerald-400' : (cloudSyncStatus.state === 'error' ? 'text-rose-400' : 'text-amber-300')}">${cloudSyncStatus.state === 'ok' ? '🟢 En vivo' : (cloudSyncStatus.state === 'error' ? '🔴 ' : '🟡 ') + cloudSyncStatus.msg}</p>
                 </div>
 
