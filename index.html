@@ -95,6 +95,7 @@
     <!-- Firebase SDK (sincronización en la nube Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="config.js"></script>
 
 
     <style>
@@ -1151,6 +1152,10 @@
                         <div class="p-4 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3 bg-slate-950/50">
                             <div id="corte-filter-chips" class="flex flex-wrap items-center gap-2"></div>
                             <button onclick="clearSalesData()" class="caja-tool bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30"><i class="fa-solid fa-rotate-left"></i> Reiniciar ventas</button>
+                            <span id="cloud-size-badge" class="px-2.5 py-1 rounded-full text-[11px] font-black border bg-slate-800 text-slate-300 border-slate-600"></span>
+                            <button onclick="exportBackup()" class="caja-tool bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30"><i class="fa-solid fa-download"></i> Descargar respaldo</button>
+                            <button onclick="document.getElementById('backup-file').click()" class="caja-tool bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border-sky-500/30"><i class="fa-solid fa-upload"></i> Restaurar respaldo</button>
+                            <input type="file" id="backup-file" accept="application/json,.json" class="hidden" onchange="importBackup(this)">
                             <button onclick="resetFolios()" class="caja-tool bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30"><i class="fa-solid fa-hashtag"></i> Reiniciar folios mesas + web (#001)</button>
                         </div>
                         <div class="overflow-auto" style="max-height:30rem">
@@ -1762,15 +1767,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         }
         const ADMIN_IDLE_MS = 10 * 60 * 1000;
         const WAITRESS_IDLE_MS = 15 * 60 * 1000;
-        const FIREBASE_CONFIG = {
-          apiKey: "AIzaSyDseU2Tk27KgZuvgy9zT9z4q8k45xPaofI",
-          authDomain: "marisqueria-pargo.firebaseapp.com",
-          projectId: "marisqueria-pargo",
-          storageBucket: "marisqueria-pargo.firebasestorage.app",
-          messagingSenderId: "360792561354",
-          appId: "1:360792561354:web:166bf08abe2c459ebc0633"
-        };
-        const FIRESTORE_ROOM_DOC = 'marisqueria-pargo';
+        // FIREBASE_CONFIG, FIRESTORE_ROOM_DOC y BUSINESS_NAME vienen de config.js (una copia de ese archivo por cliente)
         const ALERT_CHANNEL_NAME = 'pargo_bill_alerts_v1';
         const ALERT_STORAGE_KEY = 'pargo_pro_v3_last_bill_alert';
 
@@ -1891,7 +1888,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         }));
 
         const INITIAL_STORE_CONFIG = {
-            businessName: 'Marisquería Pargo',
+            businessName: (typeof BUSINESS_NAME !== 'undefined' ? BUSINESS_NAME : 'Mi negocio'),
             hasWifi: false,
             wifiSsid: '',
             wifiPass: '',
@@ -1907,7 +1904,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
         const INITIAL_CLOUD_CONFIG = {
             enabled: false,
-            roomId: 'marisqueria-pargo',
+            roomId: FIRESTORE_ROOM_DOC,
             firebaseJson: ''
         };
 
@@ -2086,6 +2083,51 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         }
         function localDayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
         function kitchenHasOpenTickets() { return tables.some(t => (t.kitchen || []).some(k => k.status !== 'served' && kitchenNeedsTicket(k))); }
+        // ---- Folios atómicos en la nube ----
+        // El contador vive en un documento aparte y se incrementa con una transacción de Firestore,
+        // así dos meseras que confirman al mismo instante NUNCA reciben el mismo folio.
+        // Sin internet se usa el contador local (el POS sigue funcionando) y se sincroniza al volver.
+        function folioCounterRef() { return cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC + '__folio'); }
+        function _folioTimeout(ms) { return new Promise((_, rej) => setTimeout(() => rej(new Error('folio-timeout')), ms)); }
+        async function reserveFolio() {
+            const today = localDayKey();
+            if (typeof cloudDb === 'undefined' || !cloudDb || navigator.onLine === false) return null;
+            try {
+                const n = await Promise.race([cloudDb.runTransaction(async (tx) => {
+                    const ref = folioCounterRef();
+                    const snap = await tx.get(ref);
+                    let seq = snap.exists ? (Number(snap.data().seq) || 0) : 0;
+                    const day = snap.exists ? snap.data().day : '';
+                    // Mismo criterio que el reinicio local: nuevo día solo si ya no hay pendientes de ayer
+                    if (day !== today && !kitchenHasOpenTickets()) seq = 0;
+                    const next = seq + 1;
+                    tx.set(ref, { seq: next, day: (day !== today && kitchenHasOpenTickets()) ? day : today, updatedAt: new Date().toISOString() });
+                    return next;
+                }), _folioTimeout(5000)]);
+                return n;
+            } catch (e) { console.warn('reserveFolio: usando contador local', e); return null; }
+        }
+        // Avisa a la nube que ya se usó el folio n (asignado en local/offline) para que nadie más lo reciba
+        function bumpCloudFolio(n) {
+            try {
+                if (typeof cloudDb === 'undefined' || !cloudDb || navigator.onLine === false) return;
+                const today = localDayKey();
+                cloudDb.runTransaction(async (tx) => {
+                    const ref = folioCounterRef();
+                    const snap = await tx.get(ref);
+                    const cur = snap.exists ? (Number(snap.data().seq) || 0) : 0;
+                    const day = snap.exists ? snap.data().day : '';
+                    if (day === today && cur >= n) return;
+                    tx.set(ref, { seq: Math.max(day === today ? cur : 0, n), day: today, updatedAt: new Date().toISOString() });
+                }).catch(() => {});
+            } catch (e) {}
+        }
+        function resetCloudFolio() {
+            try {
+                if (typeof cloudDb === 'undefined' || !cloudDb) return;
+                folioCounterRef().set({ seq: 0, day: localDayKey(), updatedAt: new Date().toISOString() }).catch(() => {});
+            } catch (e) {}
+        }
         // Numeración nueva cada día: el primer pedido del día es #001 (si queda algo pendiente de ayer, espera)
         function rolloverKitchenSeqIfNewDay() {
             const today = localDayKey();
@@ -2103,6 +2145,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (storeConfig.webSeq[id]) return storeConfig.webSeq[id];
             storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
             storeConfig.webSeq[id] = storeConfig.kitchenSeq;
+            bumpCloudFolio(storeConfig.kitchenSeq);
             saveData();
             return storeConfig.webSeq[id];
         }
@@ -2127,14 +2170,20 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             return '';
         }
         function kitchenOrdersToday() { return storeConfig.kitchenSeqDay === localDayKey() ? (storeConfig.kitchenSeq || 0) : 0; }
-        function queueKitchenTicket(table, items, kind, note) {
+        function queueKitchenTicket(table, items, kind, note, reservedFolio) {
             if (!items || !items.length) return;
             rolloverKitchenSeqIfNewDay();
             if (!storeConfig.kitchenSeqDay) storeConfig.kitchenSeqDay = localDayKey();
             // Folio por CLIENTE: se asigna en la primera comanda de la mesa y se conserva hasta que pague / se libere
             const _today = localDayKey();
             if (!(table.folioN > 0) || table.folioDay !== _today) {
-                storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
+                if (reservedFolio > 0) {
+                    storeConfig.kitchenSeq = reservedFolio; // folio ya reservado de forma atómica en la nube
+                } else {
+                    storeConfig.kitchenSeq = (storeConfig.kitchenSeq || 0) + 1;
+                    bumpCloudFolio(storeConfig.kitchenSeq);
+                }
+                storeConfig.kitchenSeqDay = _today;
                 table.folioN = storeConfig.kitchenSeq;
                 table.folioDay = _today;
             }
@@ -2863,6 +2912,27 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             return { list, pushBack: true };
         }
 
+        // Cada mesa lleva la hora de su último cambio (_ts). Al subir a la nube, la versión más reciente de cada mesa gana,
+        // así dos meseras que editan mesas distintas casi al mismo tiempo ya no se borran el trabajo.
+        const __tblSig = {};
+        function __tblSigOf(t) { const c = Object.assign({}, t); delete c._ts; return JSON.stringify(c); }
+        try { tables.forEach(t => { __tblSig[t.id] = __tblSigOf(t); }); } catch (e) {}
+        function stampChangedTables() {
+            const now = Date.now();
+            tables.forEach(t => {
+                const sig = __tblSigOf(t);
+                if (__tblSig[t.id] !== sig) {
+                    if (!isApplyingCloudUpdate && __tblSig[t.id] !== undefined) t._ts = now;
+                    __tblSig[t.id] = sig;
+                }
+            });
+        }
+        function mergeTablesByStamp(local, cloud) {
+            return local.map(l => {
+                const c = (cloud || []).find(x => x && x.id === l.id);
+                return (c && (c._ts || 0) > (l._ts || 0)) ? c : l;
+            });
+        }
         function saveData(skipCloud = false) {
             if (!customerLockedMesaCode) {
                 tables.forEach(t => {
@@ -2874,6 +2944,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     }
                 });
             }
+            stampChangedTables();
             localStorage.setItem('pargo_pro_v3_tables', JSON.stringify(tables));
             localStorage.setItem('pargo_pro_v3_staff', JSON.stringify(staff));
             localStorage.setItem('pargo_pro_v3_catalog', JSON.stringify(catalog));
@@ -5188,7 +5259,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     <div class="flex items-center gap-2.5 min-w-0 flex-1 basis-48">
                         ${dishImgHtml(item, 'w-14 rounded-lg shrink-0')}
                         <div class="min-w-0 break-words">
-                            <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${item.name}</h5>
+                            <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${escapeHtmlText(item.name)}</h5>
                             <p class="text-[10px] text-slate-400">$${item.price.toFixed(2)} c/u · total ${item.qty}</p>
                             ${dishDescHtml(item.sku, 'text-[10px] text-slate-500 leading-snug')}
                             ${itemNotesHtml(tables.find(t => t.id === activeWaitressTableId), item)}
@@ -5210,27 +5281,33 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (pendingItems.length === 0) { showToast('No hay productos nuevos por confirmar', 'info'); return; }
             document.getElementById('confirm-order-list').innerHTML = pendingItems.map(i => `
                 <div class="flex justify-between gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2">
-                    <span class="text-white font-bold">${getPendingQty(i)} × ${i.name}${i.notes ? ` <em class="text-amber-300 font-normal">(${i.notes})</em>` : ''}</span>
+                    <span class="text-white font-bold">${getPendingQty(i)} × ${escapeHtmlText(i.name)}${i.notes ? ` <em class="text-amber-300 font-normal">(${escapeHtmlText(i.notes)})</em>` : ''}</span>
                     <span class="text-emerald-400 font-black">$${(getPendingQty(i) * i.price).toFixed(2)}</span>
                 </div>`).join('');
             document.getElementById('confirm-order-table').textContent = table.name;
             openModal('modal-confirm-order');
         }
 
-        function confirmOrderRound() {
-            const table = tables.find(t => t.id === activeWaitressTableId);
+        async function confirmOrderRound() {
+            let table = tables.find(t => t.id === activeWaitressTableId);
             if (!table) return;
             if (tablePendingCount(table) === 0) { closeModal('modal-confirm-order'); return; }
+            if (window._confirmingRound) return; // evita doble toque mientras se reserva el folio
+            window._confirmingRound = true;
+            try {
+            let _folio = null;
+            if (!(table.folioN > 0) || table.folioDay !== localDayKey()) { rolloverKitchenSeqIfNewDay(); _folio = await reserveFolio(); table = tables.find(t => t.id === activeWaitressTableId); if (!table) return; }
             const _toKitchen = table.items.filter(i => getPendingQty(i) > 0).map(i => ({ sku: i.sku, name: i.name, qty: getPendingQty(i), notes: i.notes || '' }));
             table.items.forEach(i => { i.confirmedQty = i.qty; i.notes = ''; }); // la nota ya viajó en el ticket de cocina; la siguiente ronda empieza limpia
             table.orderRounds = (table.orderRounds || 0) + 1;
             table.lastConfirmedAt = new Date().toISOString();
-            queueKitchenTicket(table, _toKitchen, 'order', '');
+            queueKitchenTicket(table, _toKitchen, 'order', '', _folio);
             saveData();
             closeModal('modal-confirm-order');
             refreshAllTableViews();
             playUiSound('confirm');
             showToast('Pedido confirmado y enviado a cocina 🔒👨‍🍳', 'success');
+            } finally { window._confirmingRound = false; }
         }
 
         // --- CORRECCIONES: SOLO EL ADMINISTRADOR (en modo Admin / Caja, con sesión desbloqueada) ---
@@ -6017,7 +6094,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                                         <span class="font-bold text-slate-200 leading-tight">${item.qty}x ${item.name}</span>
                                         <span class="font-mono font-bold text-emerald-400 shrink-0">$${(item.price * item.qty).toFixed(0)}</span>
                                     </div>
-                                    ${item.notes ? `<p class="text-[10px] text-amber-300 italic mt-0.5">Nota: ${item.notes}</p>` : ''}
+                                    ${item.notes ? `<p class="text-[10px] text-amber-300 italic mt-0.5">Nota: ${escapeHtmlText(item.notes)}</p>` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -7005,6 +7082,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         function saleWebName(s) { return String(s.tableName || '').replace(/^Para llevar\s*·\s*/, '').trim(); }
         function setCorteFilter(f) { corteFilter = f; renderAdminReports(); }
         function renderAdminReports() {
+            try { updateCloudSizeBadge(); } catch (e) {}
             { const _cd = document.getElementById('corte-date'); if (_cd && !_cd.value) _cd.value = localDayKey(); }
             { const _op = document.getElementById('owner-phone-input'); if (_op && document.activeElement !== _op) _op.value = (storeConfig.ownerPhone || '').replace(/^52/, ''); }
             const SH = corteBase();
@@ -7311,6 +7389,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             if (kitchenHasOpenTickets() || webPend) { showToast('No se pueden reiniciar los folios: hay pedidos pendientes en cocina (mesas o web). Espera a que terminen.', 'warning'); return; }
             if (!confirm('¿Reiniciar los folios de pedidos (meseras y web) a #001? Las ventas NO se borran.')) return;
             storeConfig.kitchenSeq = 0; storeConfig.kitchenSeqDay = localDayKey(); storeConfig.webSeq = {}; storeConfig.webArrived = {};
+            resetCloudFolio();
             saveData();
             refreshAllTableViews();
             showToast('Folios reiniciados: el siguiente pedido será #001 (ventas intactas)', 'success');
@@ -7337,7 +7416,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const roomInput = document.getElementById('cloud-room-id');
             const jsonInput = document.getElementById('cloud-firebase-json');
             if (cb) cb.checked = !!cloudConfig.enabled;
-            if (roomInput) roomInput.value = cloudConfig.roomId || 'marisqueria-pargo';
+            if (roomInput) roomInput.value = cloudConfig.roomId || FIRESTORE_ROOM_DOC;
             if (jsonInput) jsonInput.value = cloudConfig.firebaseJson || '';
         }
 
@@ -7361,7 +7440,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             const _cb = document.getElementById('cloud-enabled-checkbox'), _rm = document.getElementById('cloud-room-id'), _js = document.getElementById('cloud-firebase-json');
             if (!_cb || !_rm || !_js) return; // esta pantalla ya no existe: la nube se conecta sola
             const enabled = _cb.checked;
-            const roomId = (_rm.value || 'marisqueria-pargo').trim();
+            const roomId = (_rm.value || FIRESTORE_ROOM_DOC).trim();
             const firebaseJson = _js.value.trim();
 
             cloudConfig = { enabled, roomId, firebaseJson };
@@ -7567,17 +7646,63 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
         }
 
+        // Peso aproximado del documento de la nube (Firestore: máximo 1 MB por documento)
+        function cloudDocBytes() { try { return JSON.stringify({ tables, staff, catalog, salesHistory, storeConfig }).length; } catch (e) { return 0; } }
+        function updateCloudSizeBadge() {
+            const el = document.getElementById('cloud-size-badge');
+            if (!el) return;
+            const kb = Math.round(cloudDocBytes() / 1024), pct = Math.round(kb / 1024 * 100);
+            el.textContent = 'Nube: ' + kb + ' KB de 1024 (' + pct + '%)';
+            el.className = 'px-2.5 py-1 rounded-full text-[11px] font-black border ' + (pct >= 90 ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : pct >= 70 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-800 text-slate-300 border-slate-600');
+        }
+        // Si el documento se acerca al límite, se quitan primero los comprobantes (fotos) de las ventas más antiguas
+        function compactForCloud() {
+            const LIMIT = 800 * 1024;
+            let bytes = cloudDocBytes();
+            if (bytes <= LIMIT) return bytes;
+            let n = 0;
+            for (let i = salesHistory.length - 1; i >= 0 && bytes > LIMIT; i--) {
+                const sl = salesHistory[i];
+                if (sl && sl.proof) { bytes -= sl.proof.length; sl.proof = ''; sl.proofRemoved = true; n++; }
+            }
+            if (n) {
+                try { localStorage.setItem('pargo_pro_v3_sales', JSON.stringify(salesHistory)); } catch (e) {}
+                showToast('La nube se estaba llenando: se quitaron ' + n + ' fotos de comprobantes antiguos (las ventas siguen). Descarga un respaldo en Caja.', 'warning');
+            }
+            return bytes;
+        }
+        let __pushRunning = false, __pushAgain = false;
         async function pushStateToFirestore(silent = false) {
             if (!cloudDb) return;
+            if (__pushRunning) { __pushAgain = true; return; }
+            __pushRunning = true;
             try {
-                await cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC).set({
-                    tables,
-                    staff,
-                    catalog,
-                    salesHistory,
-                    storeConfig,
-                    updatedAt: new Date().toISOString()
-                }, { merge: true });
+                const bytes = compactForCloud();
+                updateCloudSizeBadge();
+                if (bytes > 980 * 1024) {
+                    updateCloudPill('Nube llena', false);
+                    const now = Date.now();
+                    if (now - lastCloudErrorToastAt > 15000) {
+                        lastCloudErrorToastAt = now;
+                        showToast('La nube está llena (' + Math.round(bytes / 1024) + ' KB de 1024). Descarga el respaldo en Caja y usa "Reiniciar ventas"; si no, los cambios no se guardan.', 'error');
+                    }
+                    return;
+                }
+                const ref = cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC);
+                const build = (tbls) => ({ tables: tbls, staff, catalog, salesHistory, storeConfig, updatedAt: new Date().toISOString() });
+                let done = false;
+                if (navigator.onLine !== false && typeof cloudDb.runTransaction === 'function' && !customerLockedMesaCode) {
+                    try {
+                        await cloudDb.runTransaction(async (tx) => {
+                            const snap = await tx.get(ref);
+                            const cloudTables = snap.exists && snap.data() ? snap.data().tables : null;
+                            const merged = Array.isArray(cloudTables) ? mergeTablesByStamp(tables, cloudTables) : tables;
+                            tx.set(ref, build(merged), { merge: true });
+                        });
+                        done = true;
+                    } catch (te) { done = false; }
+                }
+                if (!done) await ref.set(build(tables), { merge: true });
                 updateCloudPill('Nube Activa', true);
             } catch (e) {
                 updateCloudPill('Error Nube', false);
@@ -7586,7 +7711,49 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     lastCloudErrorToastAt = now;
                     showToast('No se pudo guardar en la nube (' + ((e && e.code) ? e.code : 'error') + '). Los clientes no verán los cambios.', 'error');
                 }
+            } finally {
+                __pushRunning = false;
+                if (__pushAgain) { __pushAgain = false; setTimeout(() => { try { pushStateToFirestore(true); } catch (e) {} }, 50); }
             }
+        }
+
+        // --- RESPALDO MANUAL (descargar / restaurar) ---
+        function exportBackup() {
+            try {
+                const cfg = Object.assign({}, storeConfig); delete cfg.adminAuth;
+                const data = { app: 'pargo-pos', version: 1, exportedAt: new Date().toISOString(), tables, staff, catalog, salesHistory, storeConfig: cfg };
+                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'respaldo-pos-' + localDayKey() + '.json';
+                document.body.appendChild(a); a.click();
+                setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+                showToast('Respaldo descargado. Guárdalo en un lugar seguro: incluye claves de las meseras.', 'success');
+            } catch (e) { showToast('No se pudo crear el respaldo', 'error'); }
+        }
+        function importBackup(input) {
+            const f = input && input.files && input.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = () => {
+                try {
+                    const d = JSON.parse(r.result);
+                    if (!d || d.app !== 'pargo-pos' || !Array.isArray(d.tables) || !Array.isArray(d.salesHistory)) throw new Error('formato');
+                    if (!confirm('Esto REEMPLAZA mesas, meseras, menú y ventas de este equipo y de la nube con el respaldo del ' + String(d.exportedAt || '').slice(0, 10) + '. ¿Continuar?')) return;
+                    const keepAuth = storeConfig.adminAuth;
+                    tables = d.tables;
+                    if (Array.isArray(d.staff)) staff = d.staff;
+                    if (Array.isArray(d.catalog)) catalog = d.catalog;
+                    salesHistory = d.salesHistory;
+                    storeConfig = Object.assign({}, INITIAL_STORE_CONFIG, d.storeConfig || {});
+                    if (keepAuth) storeConfig.adminAuth = keepAuth;
+                    saveData();
+                    showToast('Respaldo restaurado', 'success');
+                    setTimeout(() => location.reload(), 800);
+                } catch (e) { showToast('El archivo no es un respaldo válido de este sistema', 'error'); }
+            };
+            r.readAsText(f);
+            input.value = '';
         }
 
         // --- MODO 3: VISTA CLIENTE ---
@@ -7765,7 +7932,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                             <div class="flex items-center gap-3">
                                 ${dishImgHtml(item, 'w-14 rounded-xl')}
                                 <div>
-                                    <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${item.name}</h5>
+                                    <h5 class="text-xs font-bold text-white">${dishBadge(dishNumByItem(item))}${escapeHtmlText(item.name)}</h5>
                                     <p class="text-[10px] text-slate-400">$${item.price.toFixed(2)} x ${item.qty} u.</p>
                                     ${itemNotesHtml(table, item)}
                                     ${getPendingQty(item) > 0 ? `<p class="text-[10px] text-amber-300 font-semibold">⏳ ${getPendingQty(item)} por confirmar</p>` : ''}
