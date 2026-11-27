@@ -257,6 +257,7 @@
         body.kitchen-locked #role-nav,
         body.kitchen-locked #paying-tables-alert-banner { display: none !important; }
         /* Enlaces de mesero/cocina: la barra solo muestra Instalar y Para llevar (sin botones de roles) */
+        body.waiter-locked #back-admin-btn, body.kitchen-locked #back-admin-btn { display: none !important; }
         body.waiter-locked #role-nav > button[id^="role-btn-"], body.waiter-locked #role-nav > button[id^="viewlock-btn-"],
         body.kitchen-locked #role-nav > button[id^="role-btn-"], body.kitchen-locked #role-nav > button[id^="viewlock-btn-"] { display: none !important; }
         html.pwa-can body.waiter-locked #role-nav, html.pwa-can body.kitchen-locked #role-nav { display: flex !important; }
@@ -278,6 +279,63 @@
             #role-nav > button { min-width: 0; padding-left: .2rem; padding-right: .2rem; font-size: 11px !important; }
             #role-nav > button span { line-height: 1.1; text-align: center; }
         }
+
+
+        /* ===== Menú "Equipo" (Mesera + Cocina) y "Enlaces" ===== */
+        #access-menu-panel .team-row { display: flex; align-items: stretch; gap: .35rem; }
+        #access-menu-panel button[id^="role-btn-"] { flex: 1 1 auto; min-width: 0; flex-direction: row !important; justify-content: flex-start !important; gap: .7rem !important; padding: .65rem .85rem !important; font-size: 13px !important; border-radius: 12px; border: 1px solid #334155; background: rgba(30,41,59,.55) !important; color: #cbd5e1 !important; box-shadow: none !important; }
+        #access-menu-panel button[id^="role-btn-"]:hover { background: rgba(51,65,85,.8) !important; color: #fff !important; }
+        #access-menu-panel button[id^="role-btn-"].team-active { background: #ea580c !important; border-color: #f97316; color: #fff !important; }
+        #access-menu-panel button[id^="role-btn-"] i { width: 1.25rem; text-align: center; font-size: 14px !important; }
+        #access-menu-panel button[id^="role-btn-"] span { text-align: left; }
+        #access-menu-panel button[id^="viewlock-btn-"], #access-menu-panel .team-copy { width: 2.5rem; flex: 0 0 2.5rem; padding: 0 !important; border-radius: 12px; border: 1px solid #334155; background: rgba(30,41,59,.55); align-items: center; justify-content: center; }
+        #access-menu-panel button[id^="viewlock-btn-"]:not(.hidden), #access-menu-panel .team-copy:not(.hidden) { display: flex; }
+        #access-menu-panel button[id^="viewlock-btn-"]:hover, #access-menu-panel .team-copy:hover { background: rgba(51,65,85,.9); }
+
+
+        /* ===== Encabezado limpio (admin): solo marca, Instalar / Admin y la hora ===== */
+        body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #cloud-status-pill,
+        body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #btn-sound-toggle,
+        body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header > button[aria-label="Mantener pantalla encendida"] { display: none !important; }
+        body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #header-tools > div:last-child { display: flex !important; font-size: 12px; }
+        @media (min-width: 768px) {
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header.sticky { flex-wrap: nowrap; justify-content: space-between; gap: 1rem; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header.sticky > div:first-child { flex: 1 1 0; flex-basis: 0; justify-content: flex-start; min-width: 0; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header.sticky > div:first-child > div { justify-content: flex-start; text-align: left; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #role-nav { flex: 0 0 auto; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #header-tools { flex: 1 1 0; justify-content: flex-end; }
+        }
+
+
+        /* ===== TELÉFONO (modo admin): encabezado en una fila, barra de abajo solo si hace falta ===== */
+        @media (max-width: 767px) {
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header.sticky { flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: .5rem; padding: .5rem .75rem; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header.sticky > div:first-child { flex: 1 1 0; min-width: 0; flex-basis: 0; justify-content: flex-start; gap: .6rem; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) header.sticky > div:first-child > div { justify-content: flex-start; text-align: left; min-width: 0; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #header-restaurant-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #header-tools { flex: 0 0 auto; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #live-clock-date,
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #live-clock-time + span { display: none; }
+            body:not(.waiter-locked):not(.kitchen-locked):not(.customer-locked) #header-tools > div:last-child { padding-left: 0; font-size: 13px; gap: .4rem; }
+            #role-nav.nav-empty { display: none !important; }
+            body.nav-empty { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
+            body.nav-empty #role-view-admin, body.nav-empty #role-view-customer, body.nav-empty #role-view-kitchen { padding-bottom: 1rem !important; }
+            body.nav-empty #role-view-waitress > div:first-child { padding-bottom: 1.5rem !important; }
+            body.nav-empty #waitress-order-panel { padding-bottom: 1rem !important; }
+            /* barra del admin: pestañas cómodas para el dedo */
+            #role-view-admin > div:first-child { gap: .5rem; scroll-padding: 0 .75rem; }
+            #role-view-admin > div:first-child button { min-height: 40px; }
+            #access-menu-panel, #links-menu-panel { max-width: calc(100vw - 16px); }
+        }
+
+
+        /* ===== Barra del admin: espacios parejos ===== */
+        #role-view-admin > div:first-child { justify-content: flex-start !important; gap: .5rem; }
+        #role-view-admin > div:first-child > div:first-child { gap: .25rem; flex: 0 0 auto; }
+        #role-view-admin > div:first-child > div:first-child > button, #role-view-admin > div:first-child > div:first-child #access-menu > button { padding: .5rem .85rem; }
+        #role-view-admin #llevar-fab { margin-left: .5rem; }
+        #role-view-admin > div:first-child > button[onclick^="openAdminAuthModal('change')"] { margin-left: auto; }
+        #role-view-admin > div:first-child > button { flex: 0 0 auto; }
 
         /* ===== PULIDO VISUAL (solo apariencia) ===== */
         body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
@@ -371,28 +429,13 @@
                 <i class="fa-solid fa-download text-base md:text-xs"></i>
                 <span>Instalar</span>
             </button>
-            <button onclick="switchRole('admin')" id="role-btn-admin" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
+            <button type="button" id="back-admin-btn" onclick="switchRole('admin')" style="display:none" class="flex-1 md:flex-none flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all bg-orange-600 text-white shadow-md" title="Volver al panel de administrador">
+                <i class="fa-solid fa-arrow-left text-base md:text-xs"></i>
+                <span>Volver a Admin</span>
+            </button>
+            <button onclick="switchRole('admin')" id="role-btn-admin" style="display:none" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
                 <i class="fa-solid fa-lock text-base md:text-xs"></i>
                 <span>Admin / Caja</span>
-            </button>
-            <button onclick="switchRole('waitress')" id="role-btn-waitress" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all bg-orange-600 text-white shadow-md">
-                <i class="fa-solid fa-user-tie text-base md:text-xs"></i>
-                <span>Mesera</span>
-            </button>
-            <button onclick="openViewLockSet('waitress')" id="viewlock-btn-waitress" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña para modificar desde la pantalla de Mesera (si no pones una, se usa la de administrador)"><i class="fa-solid fa-lock-open"></i></button>
-            <button onclick="switchRole('kitchen')" id="role-btn-kitchen" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
-                <i class="fa-solid fa-fire-burner text-base md:text-xs"></i>
-                <span>Cocina</span>
-            </button>
-            <button onclick="openViewLockSet('kitchen')" id="viewlock-btn-kitchen" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña opcional para el enlace de Cocina"><i class="fa-solid fa-lock-open"></i></button>
-            <button onclick="switchRole('customer')" id="role-btn-customer" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
-                <i class="fa-solid fa-mobile-screen text-base md:text-xs"></i>
-                <span>Vista Cliente</span>
-            </button>
-            <button onclick="openViewLockSet('customer')" id="viewlock-btn-customer" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña opcional para Ver como Cliente"><i class="fa-solid fa-lock-open"></i></button>
-            <button type="button" id="llevar-fab" style="display:none" class="flex-1 md:flex-none flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all bg-sky-600 text-white shadow-md" title="Pedidos para llevar">
-                <i class="fa-solid fa-bag-shopping text-base md:text-xs"></i>
-                <span>Para llevar <span id="llevar-badge" class="ml-0.5 px-1.5 rounded-full bg-rose-600 text-white" style="display:none"></span></span>
             </button>
         </nav>
 
@@ -526,15 +569,44 @@
                     <button onclick="setAdminSubtab('cloud-sync')" id="admin-nav-cloud-sync" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white whitespace-nowrap">
                         <i class="fa-solid fa-cloud mr-1.5"></i> Nube
                     </button>
+                    <div class="relative shrink-0" id="access-menu">
+                    <button type="button" id="access-menu-btn" onclick="toggleAccessMenu(event)" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white whitespace-nowrap" title="Mesera, Cocina, Vista Cliente y Para llevar">
+                        <i class="fa-solid fa-table-columns mr-1.5"></i> Accesos <i class="fa-solid fa-chevron-down text-[8px] ml-0.5"></i>
+                    </button>
+                    <div id="access-menu-panel" class="hidden fixed z-50 w-72 rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl p-2 space-y-1.5">
+                        <p class="px-2 pt-1 text-[10px] font-black uppercase tracking-wider text-slate-500">Entrar y ver como…</p>
+                        <div class="team-row flex items-center gap-1">
+                        <button onclick="switchRole('waitress')" id="role-btn-waitress" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all bg-orange-600 text-white shadow-md">
+                <i class="fa-solid fa-user-tie text-base md:text-xs"></i>
+                <span>Mesera</span>
+            </button>
+                        <button onclick="openViewLockSet('waitress')" id="viewlock-btn-waitress" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña para modificar desde la pantalla de Mesera (si no pones una, se usa la de administrador)"><i class="fa-solid fa-lock-open"></i></button>
+                        <button type="button" onclick="copyTeamLink('mesero')" class="team-copy hidden px-2 py-2 shrink-0 rounded-xl text-sm text-slate-400 hover:text-sky-300" title="Copiar enlace de Mesera"><i class="fa-solid fa-link"></i></button>
+                    </div>
+                        <div class="team-row flex items-center gap-1">
+                        <button onclick="switchRole('kitchen')" id="role-btn-kitchen" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
+                <i class="fa-solid fa-fire-burner text-base md:text-xs"></i>
+                <span>Cocina</span>
+            </button>
+                        <button onclick="openViewLockSet('kitchen')" id="viewlock-btn-kitchen" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña opcional para el enlace de Cocina"><i class="fa-solid fa-lock-open"></i></button>
+                        <button type="button" onclick="copyTeamLink('cocina')" class="team-copy hidden px-2 py-2 shrink-0 rounded-xl text-sm text-slate-400 hover:text-sky-300" title="Copiar enlace de Cocina"><i class="fa-solid fa-link"></i></button>
+                    </div>
+                        <div class="team-row flex items-center gap-1">
+                        <button onclick="switchRole('customer')" id="role-btn-customer" class="flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 px-2 md:px-4 py-2 rounded-xl text-[11px] md:text-xs font-bold transition-all text-slate-400 hover:text-white">
+                <i class="fa-solid fa-mobile-screen text-base md:text-xs"></i>
+                <span>Vista Cliente</span>
+            </button>
+                        <button onclick="openViewLockSet('customer')" id="viewlock-btn-customer" class="hidden px-1.5 py-1 shrink-0 rounded-xl text-sm text-slate-500 hover:text-amber-300" title="Contraseña opcional para Ver como Cliente"><i class="fa-solid fa-lock-open"></i></button>
+                    </div>
+                        
+                        
+                    </div>
                 </div>
-
-                <button onclick="copyKitchenLink('cocina')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-950/50 hover:bg-orange-900/60 text-orange-300 border border-orange-500/30 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Copiar el enlace de la pantalla de cocina">
-                    <i class="fa-solid fa-fire-burner"></i><span>Copiar enlace Cocina</span>
+                    <button type="button" id="llevar-fab" style="display:none" class="items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 bg-sky-600 text-white shadow-md" title="Pedidos para llevar">
+                    <i class="fa-solid fa-bag-shopping"></i>
+                    <span>Para llevar <span id="llevar-badge" class="ml-0.5 px-1.5 rounded-full bg-rose-600 text-white" style="display:none"></span></span>
                 </button>
-
-                <button onclick="copyWaiterLink()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-950/50 hover:bg-sky-900/60 text-sky-300 border border-sky-500/30 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Copiar el enlace de la pantalla de meseras">
-                    <i class="fa-solid fa-user-tie"></i><span>Copiar enlace Mesera</span>
-                </button>
+                </div>
 
                 <button onclick="openAdminAuthModal('change')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-amber-950/60 text-amber-400 border border-slate-700 whitespace-nowrap shrink-0 flex items-center gap-1.5" title="Cambiar PIN de administrador">
                     <i class="fa-solid fa-key"></i><span class="hidden sm:inline">Usuario y contraseña</span>
@@ -2289,6 +2361,52 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     </div>`;
             }).join('');
         }
+
+        // --- Menú Accesos (Mesera / Cocina / Vista Cliente / Para llevar) y menú Enlaces ---
+        function placePanel(ev, id) {
+            if (ev) ev.stopPropagation();
+            const p = document.getElementById(id), b = ev && ev.currentTarget; if (!p) return;
+            const open = p.classList.contains('hidden');
+            ['access-menu-panel', 'links-menu-panel'].forEach(x => { const e = document.getElementById(x); if (e) e.classList.add('hidden'); });
+            if (!open) return;
+            p.classList.remove('hidden');
+            const r = b.getBoundingClientRect(), w = p.offsetWidth || 240;
+            p.style.top = (r.bottom + 8) + 'px';
+            p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+        }
+        function toggleAccessMenu(ev) { placePanel(ev, 'access-menu-panel'); }
+        function toggleLinksMenu(ev) { placePanel(ev, 'links-menu-panel'); }
+        function closeTeamMenu() { const p = document.getElementById('access-menu-panel'); if (p) p.classList.add('hidden'); }
+        function closeLinksMenu() { const p = document.getElementById('links-menu-panel'); if (p) p.classList.add('hidden'); }
+        function copyTeamLink(vista) { copyKitchenLink(vista); closeTeamMenu(); }
+        function updateTeamMenuBtn() {
+            const bb = document.getElementById('back-admin-btn');
+            if (bb) bb.style.display = (isAdminUnlocked && currentRole !== 'admin' && !waiterLocked && !kitchenLocked && !customerLockedMesaCode) ? 'flex' : 'none';
+            [['waitress', 'role-btn-waitress'], ['kitchen', 'role-btn-kitchen'], ['customer', 'role-btn-customer']].forEach(x => { const e = document.getElementById(x[1]); if (e) e.classList.toggle('team-active', currentRole === x[0]); });
+        }
+        document.addEventListener('click', function (e) {
+            const am = document.getElementById('access-menu'); if (am && !am.contains(e.target)) closeTeamMenu();
+            const lm = document.getElementById('links-menu'); if (lm && !lm.contains(e.target)) closeLinksMenu();
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeTeamMenu(); closeLinksMenu(); } });
+        window.addEventListener('resize', function () { closeTeamMenu(); closeLinksMenu(); }); window.addEventListener('scroll', function () { closeTeamMenu(); closeLinksMenu(); }, true);
+
+        // La barra de abajo (teléfono) se esconde cuando no tiene ningún botón visible
+        (function () {
+            function sync() {
+                const nav = document.getElementById('role-nav'); if (!nav) return;
+                const any = Array.from(nav.children).some(el => el.tagName === 'BUTTON' && getComputedStyle(el).display !== 'none');
+                if (nav.classList.contains('nav-empty') === !any) return;
+                nav.classList.toggle('nav-empty', !any);
+                document.body.classList.toggle('nav-empty', !any);
+            }
+            function start() {
+                const nav = document.getElementById('role-nav'); if (!nav) return;
+                new MutationObserver(sync).observe(nav, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+                sync(); setTimeout(sync, 800);
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+        })();
         function copyWaiterLink() { copyKitchenLink('mesero'); }
         function copyKitchenLink(vista) {
             vista = (typeof vista === 'string') ? vista : 'cocina';
@@ -3169,6 +3287,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             } catch (er) { showViewLockErr('No se pudo verificar en este navegador.'); }
         }
         function updateViewLockButtons() {
+            document.querySelectorAll('.team-copy').forEach(b => b.classList.toggle('hidden', !isAdminUnlocked));
             ['waitress', 'kitchen', 'customer'].forEach(r => {
                 const b = document.getElementById('viewlock-btn-' + r);
                 if (!b) return;
@@ -3241,7 +3360,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             ['kitchen', 'customer'].forEach(r => { const b = document.getElementById('role-btn-' + r); if (b) b.classList.toggle('hidden', !adm && !(r === 'kitchen' && kitchenLocked) && !(r === 'customer' && customerLockedMesaCode)); });
             const old = document.getElementById('admin-viewas-banner'); if (old) old.remove();
             // Pantalla de entrada: sin sesión de admin (y sin enlace de mesero/cocina/cliente) solo se ve el login de Admin
-            updateViewLockButtons();
+            updateViewLockButtons(); updateTeamMenuBtn();
             const vg = viewLockGateRole();
             if (vg) { const vm = document.getElementById('modal-view-lock'); if (vm && vm.classList.contains('hidden')) openViewLockGate(vg); }
             const gate = adminGateNeeded();
@@ -3298,6 +3417,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 maybeOpenWaitressLogin();
             }
             updateWaitressHeaderLogout();
+            closeTeamMenu(); updateTeamMenuBtn();
         }
 
         // --- SEGURIDAD: PIN DE ADMIN Y PIN POR MESERA ---
