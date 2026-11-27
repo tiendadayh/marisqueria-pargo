@@ -5935,8 +5935,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
               sum.className = 'grid grid-cols-2 lg:grid-cols-5 gap-3';
               const nFree = tables.filter(t => t.status === 'free').length, nOcc = tables.filter(t => t.status === 'occupied').length, nPay = tables.filter(t => t.status === 'paying').length;
               const pend = tables.reduce((a, t) => a + t.items.reduce((x, i) => x + i.price * i.qty, 0), 0);
-              const st = (label, val, col) => `<div class="mon-stat"><p class="text-[10px] uppercase tracking-wider font-bold text-slate-500">${label}</p><p class="text-xl font-black ${col}">${val}</p></div>`;
-              sum.innerHTML = st('Libres', nFree, 'text-emerald-400') + st('Ocupadas', nOcc, 'text-amber-400') + st('Cuenta pedida', nPay, 'text-purple-400') + st('Sin atender', tables.filter(t => tableTimeInfo(t).level).length, tables.some(t => tableTimeInfo(t).level === 'bad') ? 'text-rose-400' : 'text-amber-300') + st('Por cobrar', '$' + pend.toFixed(2), 'text-sky-300'); }
+              const st = (label, val, col, hex) => `<div class="mon-stat" style="border-left:3px solid ${hex}"><p class="text-[10px] uppercase tracking-wider font-bold text-slate-500 flex items-center gap-1.5"><span style="width:8px;height:8px;border-radius:50%;background:${hex};display:inline-block"></span>${label}</p><p class="text-xl font-black ${col}">${val}</p></div>`;
+              sum.innerHTML = st('Libres', nFree, 'text-emerald-400', '#10b981') + st('Ocupadas', nOcc, 'text-amber-400', '#f59e0b') + st('Cuenta pedida', nPay, 'text-purple-400', '#a855f7') + st('Sin atender', tables.filter(t => tableTimeInfo(t).level).length, 'text-rose-400', '#f43f5e') + st('Por cobrar', '$' + pend.toFixed(2), 'text-sky-300', '#38bdf8'); }
 
             tables.forEach(table => {
                 const total = table.items.reduce((s, i) => s + (i.price * i.qty), 0);
@@ -8993,8 +8993,7 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             var soundBtn = '<button onclick="llvSound()" style="' + bt2 + 'background:#475569">🔔 Probar sonido</button>';
             if (adm) {
                 h += '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:14px;border-radius:16px;background:#0b1325;border:1px solid #1e293b;margin-bottom:18px">' +
-                    '<div id="llv-qr" style="flex:none;background:#fff;padding:8px;border-radius:12px;line-height:0"></div>' +
-                    '<div style="flex:1;min-width:230px"><div style="font-size:14px;font-weight:900;color:#fff">Enlace de pedidos para tus clientes</div><div style="font-size:11px;color:#94a3b8;margin:3px 0 12px;line-height:1.35">Compártelo o imprime el QR para que pidan desde su celular.</div><div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                    '<div style="flex:1;min-width:230px"><div style="font-size:14px;font-weight:900;color:#fff">Enlace de pedidos para tus clientes</div><div style="font-size:11px;color:#94a3b8;margin:3px 0 12px;line-height:1.35">Compártelo o descarga el QR para que pidan desde su celular.</div><div style="display:flex;gap:8px;flex-wrap:wrap">' +
                     '<button onclick="llvToggle()" style="' + bt2 + 'background:' + (openNow ? '#059669' : '#be123c') + '">' + (openNow ? '🟢 Abierto · tocar para pausar' : '⏸ Pausado · tocar para abrir') + '</button>' +
                     '<button onclick="llvCopy()" style="' + bt2 + 'background:#0ea5e9">🔗 Copiar enlace</button>' +
                     '<button onclick="llvQrDownload()" style="' + bt2 + 'background:#7c3aed">⬇️ Descargar QR</button>' + soundBtn + '</div></div></div>';
@@ -9005,7 +9004,6 @@ html.llevar,html.llevar body{overflow:auto!important;height:auto!important}
             h += section('🆕 Nuevos · por aceptar', '#38bdf8', nuevos, adm, bt) + section('🔥 En cocina', '#fbbf24', coc, adm, bt) + section('🍽️ Listos · por entregar', '#f472b6', ent, adm, bt);
             if (r !== 'cocina' && hist.length) h += '<div style="margin-bottom:18px"><h3 style="font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#34d399;margin:0 0 8px">✅ Historial de hoy (' + hist.length + ')</h3><div style="background:#0f172a;border-radius:12px;overflow:hidden">' + hist.map(function (o) { return '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid #1e293b;font-size:13px"><span>' + (webFolioNum(o) ? '<b style="color:#fbbf24">' + kitchenNumLabel(webFolioNum(o)) + '</b> · ' : '') + '<b>#' + esc(o.code) + '</b> · ' + esc(o.name) + '</span><span style="color:' + (o.status === 'cancelado' ? '#f87171' : '#34d399') + '">' + (o.status === 'cancelado' ? 'Cancelado' : (adm ? $m(totalOf(o)) + ' · ' : '') + esc(o.method || '') + ' ' + hora(o.paidAt || o.updatedAt)) + '</span></div>'; }).join('') + '</div></div>';
             panel.innerHTML = h + '</div>';
-            if (adm && window.QRCode && document.getElementById('llv-qr')) { try { new QRCode(document.getElementById('llv-qr'), { text: link(), width: 112, height: 112 }); } catch (e) {} }
         }
         window.llvSound = function () { chime(); try { Notification.requestPermission(); } catch (e) {} showToast('Sonido y avisos activados', 'success'); };
         // Palomitas de cocina: se guardan en la configuración sincronizada para que el admin y la cocina vean lo mismo
