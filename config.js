@@ -15,4 +15,12 @@ const FIREBASE_CONFIG = {
 };
 const FIRESTORE_ROOM_DOC = 'marisqueria-pargo';
 
+// Seguridad (déjalos en false hasta seguir la guía de migración):
+//  AUTH_ENABLED: el personal debe iniciar sesión (Firebase Authentication, correo + contraseña).
+//  SPLIT_PRIVATE_DATA: ventas, meseras y clave del admin pasan a un documento privado que el cliente QR no puede leer.
+// Dominio interno para armar el correo de cada usuario (admin@pargo.mx, equipo@pargo.mx). No necesita existir.
+const AUTH_EMAIL_DOMAIN = 'pargo.mx';
+const AUTH_ENABLED = true;
+const SPLIT_PRIVATE_DATA = true;
+
 try { document.title = BUSINESS_NAME + ' - Punto de Venta'; } catch (e) {}

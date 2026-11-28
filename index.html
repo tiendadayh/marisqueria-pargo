@@ -95,6 +95,7 @@
     <!-- Firebase SDK (sincronización en la nube Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="config.js"></script>
 
 
@@ -2083,6 +2084,77 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         }
         function localDayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
         function kitchenHasOpenTickets() { return tables.some(t => (t.kitchen || []).some(k => k.status !== 'served' && kitchenNeedsTicket(k))); }
+        // ---- Seguridad: inicio de sesión del personal + datos privados separados (interruptores en config.js) ----
+        const AUTH_ON = (typeof AUTH_ENABLED !== 'undefined' && AUTH_ENABLED === true);
+        const SPLIT_ON = (typeof SPLIT_PRIVATE_DATA !== 'undefined' && SPLIT_PRIVATE_DATA === true);
+        let cloudAuthUser = null;
+        function pubRef() { return cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC); }
+        function privRef() { return cloudDb.collection('gastropos_private').doc(FIRESTORE_ROOM_DOC); }
+        // Documento público (lo lee el cliente por QR): mesas, menú y datos del negocio. Sin ventas ni claves.
+        function cloudPublicPayload(tbls) {
+            const now = new Date().toISOString();
+            if (!SPLIT_ON) return { tables: tbls, staff, catalog, salesHistory, storeConfig, updatedAt: now };
+            const FV = firebase.firestore.FieldValue;
+            const cfg = Object.assign({}, storeConfig);
+            cfg.adminAuth = FV.delete();
+            return { tables: tbls, catalog, storeConfig: cfg, staff: FV.delete(), salesHistory: FV.delete(), updatedAt: now };
+        }
+        // Documento privado (solo personal con sesión): meseras (con claves), ventas y clave del admin.
+        function cloudPrivatePayload() {
+            return { staff, salesHistory, adminAuth: storeConfig.adminAuth || null, updatedAt: new Date().toISOString() };
+        }
+        function applyPrivateCloudData(data) {
+            if (!data) return;
+            isApplyingCloudUpdate = true;
+            try {
+                if (Array.isArray(data.staff)) staff = data.staff;
+                if (Array.isArray(data.salesHistory)) {
+                    const _ms = mergeCloudSales(data.salesHistory, storeConfig);
+                    salesHistory = _ms.list;
+                    if (_ms.pushBack) setTimeout(() => { try { pushStateToFirestore(true); } catch (e) {} }, 500);
+                }
+                if (data.adminAuth) storeConfig.adminAuth = data.adminAuth;
+                saveData(true);
+                populateWaitressSessionSelect();
+                refreshAllTableViews();
+                renderAdminStaff();
+                renderAdminReports();
+            } catch (e) { console.error('Error aplicando datos privados', e); }
+            finally { isApplyingCloudUpdate = false; }
+        }
+        function showStaffLogin(auth) {
+            let el = document.getElementById('staff-login-overlay');
+            if (el) { el.style.display = 'flex'; return; }
+            el = document.createElement('div');
+            el.id = 'staff-login-overlay';
+            el.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#020617;padding:16px;font-family:system-ui,sans-serif';
+            el.innerHTML = '<form id="staff-login-form" style="width:100%;max-width:340px;background:#0f172a;border:1px solid #334155;border-radius:20px;padding:24px;color:#fff">'
+                + '<div style="font-size:34px;text-align:center">🔐</div>'
+                + '<h2 style="text-align:center;font-weight:900;font-size:18px;margin:8px 0 4px">' + escapeHtmlText(storeConfig.businessName || 'Punto de venta') + '</h2>'
+                + '<p style="text-align:center;font-size:12px;color:#94a3b8;margin:0 0 16px">Inicia sesión (usuario y contraseña)</p>'
+                + '<input id="staff-login-email" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="Usuario" required style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #475569;background:#020617;color:#fff;margin-bottom:10px;font-size:16px">'
+                + '<input id="staff-login-pass" type="password" autocomplete="current-password" placeholder="Contraseña" required style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #475569;background:#020617;color:#fff;margin-bottom:10px;font-size:16px">'
+                + '<p id="staff-login-err" style="color:#fb7185;font-size:12px;min-height:16px;margin:0 0 8px"></p>'
+                + '<button type="submit" style="width:100%;padding:12px;border-radius:12px;background:#10b981;color:#020617;font-weight:900;font-size:14px;border:0">Entrar</button>'
+                + '</form>';
+            document.body.appendChild(el);
+            document.getElementById('staff-login-form').addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const err = document.getElementById('staff-login-err');
+                err.textContent = '';
+                try {
+                    let _u = document.getElementById('staff-login-email').value.trim().toLowerCase();
+                    // Sin @: se completa con el dominio interno (no es un correo real)
+                    if (_u.indexOf('@') === -1) _u += '@' + ((typeof AUTH_EMAIL_DOMAIN !== 'undefined' && AUTH_EMAIL_DOMAIN) || 'pargo.mx');
+                    await auth.signInWithEmailAndPassword(_u, document.getElementById('staff-login-pass').value);
+                } catch (e) {
+                    const c = e && e.code || '';
+                    err.textContent = (c === 'auth/network-request-failed') ? 'Sin conexión a internet.' : (c === 'auth/too-many-requests') ? 'Demasiados intentos. Espera unos minutos.' : 'Usuario o contraseña incorrectos.';
+                }
+            });
+        }
+        function staffSignOut() { try { const a = firebase.apps.find(x => x.name === 'pargo_pos_cloud'); if (a) a.auth().signOut().then(() => location.reload()); } catch (e) {} }
+
         // ---- Folios atómicos en la nube ----
         // El contador vive en un documento aparte y se incrementa con una transacción de Firestore,
         // así dos meseras que confirman al mismo instante NUNCA reciben el mismo folio.
@@ -7554,11 +7626,15 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const appName = 'pargo_pos_cloud';
                 const existingApp = firebase.apps.find(a => a.name === appName);
                 const app = existingApp || firebase.initializeApp(FIREBASE_CONFIG, appName);
-                cloudDb = app.firestore();
+                const _db = app.firestore();
+                const _gated = AUTH_ON && !customerLockedMesaCode;
+                if (!_gated) cloudDb = _db;
                 if (!existingApp) {
-                    try { cloudDb.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
+                    try { _db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
                 }
 
+                const startSync = () => {
+                cloudDb = _db;
                 const docRef = cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC);
                 updateCloudPill(navigator.onLine ? 'Nube Activa' : 'Sin internet', navigator.onLine);
 
@@ -7625,6 +7701,35 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     if (customerLockedMesaCode) renderCustomerView();
                     else showToast('No se pudo leer la nube (' + code + '). Revisa las reglas de Firestore.', 'error');
                 });
+                // Datos privados (meseras, ventas, clave admin): solo el personal con sesión los lee
+                if (SPLIT_ON && !customerLockedMesaCode) {
+                    if (window.__privUnsub) { try { window.__privUnsub(); } catch (e) {} }
+                    window.__privUnsub = privRef().onSnapshot({ includeMetadataChanges: true }, (psnap) => {
+                        if (psnap.metadata && psnap.metadata.hasPendingWrites) return;
+                        if (localStorage.getItem('pargo_offline_dirty') === '1') return;
+                        if (!psnap.exists) return; // aún no migrado: el primer guardado lo crea
+                        applyPrivateCloudData(psnap.data());
+                    }, (err) => { showToast('No se pudieron leer los datos privados (' + ((err && err.code) || 'error') + '). Revisa las reglas de Firestore.', 'error'); });
+                }
+                };
+
+                if (_gated) {
+                    const auth = app.auth();
+                    let _started = false;
+                    updateCloudPill('Inicia sesión', false);
+                    auth.onAuthStateChanged((user) => {
+                        cloudAuthUser = user || null;
+                        const ov = document.getElementById('staff-login-overlay');
+                        if (user) {
+                            if (ov) ov.style.display = 'none';
+                            if (!_started) { _started = true; startSync(); }
+                        } else {
+                            showStaffLogin(auth);
+                        }
+                    });
+                } else {
+                    startSync();
+                }
             } catch (e) {
                 updateCloudPill('Local', false);
             }
@@ -7637,9 +7742,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             }
             if (!confirm('Esto reemplaza los datos de la nube con los de este dispositivo. ¿Continuar?')) return;
             try {
-                await cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC).set({
-                    tables, staff, catalog, salesHistory, storeConfig, updatedAt: new Date().toISOString()
-                }, { merge: true });
+                await pubRef().set(cloudPublicPayload(tables), { merge: true });
+                if (SPLIT_ON) await privRef().set(cloudPrivatePayload(), { merge: true });
                 showToast('Datos enviados a la nube', 'success');
             } catch (e) {
                 showToast('No se pudo enviar (' + ((e && e.code) ? e.code : 'error') + ')', 'error');
@@ -7674,6 +7778,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         let __pushRunning = false, __pushAgain = false;
         async function pushStateToFirestore(silent = false) {
             if (!cloudDb) return;
+            if (AUTH_ON && !customerLockedMesaCode && !cloudAuthUser) return;
             if (__pushRunning) { __pushAgain = true; return; }
             __pushRunning = true;
             try {
@@ -7689,9 +7794,11 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     return;
                 }
                 const ref = cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC);
-                const build = (tbls) => ({ tables: tbls, staff, catalog, salesHistory, storeConfig, updatedAt: new Date().toISOString() });
+                const isCust = !!customerLockedMesaCode;
+                // El cliente (QR) solo escribe mesas; nunca menú, ventas ni configuración
+                const build = (tbls) => (SPLIT_ON && isCust) ? { tables: tbls, updatedAt: new Date().toISOString() } : cloudPublicPayload(tbls);
                 let done = false;
-                if (navigator.onLine !== false && typeof cloudDb.runTransaction === 'function' && !customerLockedMesaCode) {
+                if (navigator.onLine !== false && typeof cloudDb.runTransaction === 'function' && (!isCust || SPLIT_ON)) {
                     try {
                         await cloudDb.runTransaction(async (tx) => {
                             const snap = await tx.get(ref);
@@ -7703,6 +7810,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                     } catch (te) { done = false; }
                 }
                 if (!done) await ref.set(build(tables), { merge: true });
+                if (SPLIT_ON && !isCust) await privRef().set(cloudPrivatePayload(), { merge: true });
                 updateCloudPill('Nube Activa', true);
             } catch (e) {
                 updateCloudPill('Error Nube', false);
@@ -8459,10 +8567,9 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                         var d = snap && snap.exists ? snap.data() : null;
                         if (d && Array.isArray(d.salesHistory)) salesHistory = mergeCloudSales(d.salesHistory, d.storeConfig).list;
                     } catch (e) {}
-                    return ref.set({
-                        tables: tables, staff: staff, catalog: catalog, salesHistory: salesHistory, storeConfig: storeConfig,
-                        updatedAt: new Date().toISOString()
-                    }, { merge: true });
+                    return ref.set(cloudPublicPayload(tables), { merge: true }).then(function () {
+                        if (SPLIT_ON) return privRef().set(cloudPrivatePayload(), { merge: true });
+                    });
                 }).then(function () {
                     localStorage.removeItem('pargo_offline_dirty');
                     updateCloudPill('Nube Activa', true);
