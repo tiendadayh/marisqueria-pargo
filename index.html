@@ -2088,6 +2088,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
         const AUTH_ON = (typeof AUTH_ENABLED !== 'undefined' && AUTH_ENABLED === true);
         const SPLIT_ON = (typeof SPLIT_PRIVATE_DATA !== 'undefined' && SPLIT_PRIVATE_DATA === true);
         let cloudAuthUser = null;
+        let cloudIsAdmin = false; // la cuenta de Firebase con la que se entró está en la lista de admins
         function pubRef() { return cloudDb.collection('gastropos_rooms').doc(FIRESTORE_ROOM_DOC); }
         function privRef() { return cloudDb.collection('gastropos_private').doc(FIRESTORE_ROOM_DOC); }
         // Documento público (lo lee el cliente por QR): mesas, menú y datos del negocio. Sin ventas ni claves.
@@ -2129,7 +2130,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             el.id = 'staff-login-overlay';
             el.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#020617;padding:16px;font-family:system-ui,sans-serif';
             el.innerHTML = '<form id="staff-login-form" style="width:100%;max-width:340px;background:#0f172a;border:1px solid #334155;border-radius:20px;padding:24px;color:#fff">'
-                + '<div style="font-size:34px;text-align:center">🔐</div>'
+                + '<div style="text-align:center">' + ((document.getElementById('brand-logo') && document.getElementById('brand-logo').src) ? '<img src="' + document.getElementById('brand-logo').src + '" alt="" style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:3px solid #fbbf24">' : '<span style="font-size:34px">🔐</span>') + '</div>'
                 + '<h2 style="text-align:center;font-weight:900;font-size:18px;margin:8px 0 4px">' + escapeHtmlText(storeConfig.businessName || 'Punto de venta') + '</h2>'
                 + '<p style="text-align:center;font-size:12px;color:#94a3b8;margin:0 0 16px">Inicia sesión (usuario y contraseña)</p>'
                 + '<input id="staff-login-email" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="Usuario" required style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #475569;background:#020617;color:#fff;margin-bottom:10px;font-size:16px">'
@@ -3578,6 +3579,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             Object.keys(viewPass).forEach(k => { if (k !== role) delete viewPass[k]; });
             // ⚠️ MODO PRUEBAS: entra a Admin sin PIN. Para volver a pedir PIN, cambia a false.
             if (ADMIN_PIN_BYPASS) isAdminUnlocked = (role === 'admin');
+            if (role === 'admin' && !isAdminUnlocked && AUTH_ON && cloudIsAdmin) { isAdminUnlocked = true; lastActivityAt = Date.now(); }
             if (role === 'admin' && !isAdminUnlocked) {
                 openAdminAuthModal();
                 return;
@@ -3812,6 +3814,22 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 if (rem > 0) { showAdminAuthError(`Demasiados intentos. Espera ${fmtWait(rem)} para volver a intentar.`); return; }
                 const typed = input.value;
                 const userTyped = ((document.getElementById('admin-user-input') || {}).value || '').trim().toLowerCase();
+                // Con Firebase activo, este mismo panel inicia la sesión de la nube (un solo login)
+                if (adminAuthMode === 'login' && AUTH_ON && !cloudAuthUser && window.__fbAuth) {
+                    if (!userTyped || !typed) { showAdminAuthError('Escribe tu usuario y contraseña.'); return; }
+                    let _em = userTyped;
+                    if (_em.indexOf('@') === -1) _em += '@' + ((typeof AUTH_EMAIL_DOMAIN !== 'undefined' && AUTH_EMAIL_DOMAIN) || 'pargo.mx');
+                    try {
+                        await window.__fbAuth.signInWithEmailAndPassword(_em, typed);
+                        input.value = '';
+                        const _ue = document.getElementById('admin-user-input'); if (_ue) _ue.value = '';
+                    } catch (fe) {
+                        const c = fe && fe.code || '';
+                        showAdminAuthError(c === 'auth/network-request-failed' ? 'Sin conexión a internet.' : c === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos.' : 'Usuario o contraseña incorrectos.');
+                        input.value = ''; input.focus();
+                    }
+                    return; // al iniciar sesión, el sistema comprueba si es admin y abre solo
+                }
                 const savedUser = (storeConfig.adminAuth && storeConfig.adminAuth.user) || '';
                 if (adminAuthMode === 'login') {
                     if (!userTyped) { showAdminAuthError('Escribe tu usuario.'); return; }
@@ -3862,6 +3880,8 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             switchRole('waitress');
             updateRoleNavVisibility();
             showToast('Modo Admin bloqueado', 'info');
+            // Con inicio de sesión de Firebase, bloquear también cierra la sesión (si no, se volvería a abrir solo)
+            if (AUTH_ON && cloudIsAdmin) { cloudIsAdmin = false; setTimeout(() => { try { staffSignOut(); } catch (e) {} }, 400); }
         }
 
         // --- MESERA: ACCESO CON USUARIO Y CONTRASEÑA PROPIOS ---
@@ -7715,6 +7735,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
 
                 if (_gated) {
                     const auth = app.auth();
+                    window.__fbAuth = auth;
                     let _started = false;
                     updateCloudPill('Inicia sesión', false);
                     auth.onAuthStateChanged((user) => {
@@ -7723,8 +7744,21 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                         if (user) {
                             if (ov) ov.style.display = 'none';
                             if (!_started) { _started = true; startSync(); }
+                            // ¿Es la cuenta de administrador? Entonces también abre el panel de Admin (un solo inicio de sesión)
+                            _db.collection('gastropos_roles').doc('staff').get().then((rs) => {
+                                const d = rs.exists ? rs.data() : null;
+                                cloudIsAdmin = !!(d && Array.isArray(d.admins) && user.email && d.admins.map(x => String(x).toLowerCase()).indexOf(String(user.email).toLowerCase()) !== -1);
+                                if (cloudIsAdmin && !isAdminUnlocked && adminGateNeeded()) unlockAdmin('Sesión de administrador');
+                                else if (!cloudIsAdmin && adminGateNeeded()) showAdminAuthError('No se pudo confirmar que esta cuenta sea de administrador. Si ya tenías una clave de administración, escríbela.');
+                            }).catch(() => { if (adminGateNeeded()) showAdminAuthError('Sesión iniciada. Escribe tu clave de administración.'); });
                         } else {
-                            showStaffLogin(auth);
+                            if (adminGateNeeded()) {
+                                // Pantalla principal (admin): el login es el panel con el logo
+                                const mm = document.getElementById('modal-admin-auth');
+                                if (!mm || mm.classList.contains('hidden')) { try { openAdminAuthModal('login'); } catch (e) { showStaffLogin(auth); } }
+                            } else {
+                                showStaffLogin(auth);
+                            }
                         }
                     });
                 } else {
