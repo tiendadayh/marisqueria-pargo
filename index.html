@@ -3583,7 +3583,6 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             Object.keys(viewPass).forEach(k => { if (k !== role) delete viewPass[k]; });
             // ⚠️ MODO PRUEBAS: entra a Admin sin PIN. Para volver a pedir PIN, cambia a false.
             if (ADMIN_PIN_BYPASS) isAdminUnlocked = (role === 'admin');
-            if (role === 'admin' && !isAdminUnlocked && AUTH_ON && cloudIsAdmin) { isAdminUnlocked = true; lastActivityAt = Date.now(); }
             if (role === 'admin' && !isAdminUnlocked) {
                 openAdminAuthModal();
                 return;
@@ -3819,13 +3818,16 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const typed = input.value;
                 const userTyped = ((document.getElementById('admin-user-input') || {}).value || '').trim().toLowerCase();
                 // Con Firebase activo, este mismo panel inicia la sesión de la nube (un solo login)
-                if (adminAuthMode === 'login' && AUTH_ON) {
+                // Teléfono con sesión de admin ya verificada: sigue la clave de administración de siempre (usuario + clave corta)
+                if (adminAuthMode === 'login' && AUTH_ON && cloudAuthUser && !window.__rolesDone) { showAdminAuthError('Verificando la cuenta, intenta en un momento.'); return; }
+                if (adminAuthMode === 'login' && AUTH_ON && !(cloudAuthUser && cloudIsAdmin)) {
                     if (!window.__fbAuth) { showAdminAuthError('No se pudo conectar con el servidor. Revisa tu internet e intenta de nuevo.'); return; }
                     if (!userTyped || !typed) { showAdminAuthError('Escribe tu usuario y contraseña.'); return; }
                     let _em = userTyped;
                     if (_em.indexOf('@') === -1) _em += '@' + ((typeof AUTH_EMAIL_DOMAIN !== 'undefined' && AUTH_EMAIL_DOMAIN) || 'pargo.mx');
                     try {
                         await window.__fbAuth.signInWithEmailAndPassword(_em, typed);
+                        window.__justSignedIn = true;
                         try { const _cu = window.__fbAuth.currentUser; if (_cu && window.__checkAdminRole) window.__checkAdminRole(_cu); } catch (e) {}
                         input.value = '';
                         const _ue = document.getElementById('admin-user-input'); if (_ue) _ue.value = '';
@@ -3834,7 +3836,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                         showAdminAuthError(c === 'auth/network-request-failed' ? 'Sin conexión a internet.' : c === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos.' : 'Usuario o contraseña incorrectos.');
                         input.value = ''; input.focus();
                     }
-                    return; // al iniciar sesión, el sistema comprueba si es admin y abre solo (ya no hay clave de respaldo)
+                    return; // al iniciar sesión se comprueba si es admin; si lo es, se pide la clave de administración
                 }
                 const savedUser = (storeConfig.adminAuth && storeConfig.adminAuth.user) || '';
                 if (adminAuthMode === 'login') {
@@ -3886,8 +3888,6 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
             switchRole('waitress');
             updateRoleNavVisibility();
             showToast('Modo Admin bloqueado', 'info');
-            // Con inicio de sesión de Firebase, bloquear también cierra la sesión (si no, se volvería a abrir solo)
-            if (AUTH_ON && cloudIsAdmin) { cloudIsAdmin = false; setTimeout(() => { try { staffSignOut(); } catch (e) {} }, 400); }
         }
 
         // --- MESERA: ACCESO CON USUARIO Y CONTRASEÑA PROPIOS ---
@@ -7752,21 +7752,27 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                             if (!_started) { _started = true; startSync(); }
                             // ¿Es la cuenta de administrador? Entonces también abre el panel de Admin (un solo inicio de sesión)
                             window.__checkAdminRole = (user) => {
-                            window.__rolesErr = '';
+                            window.__rolesErr = ''; window.__rolesDone = false;
                             const _ck = 'pargo_is_admin_' + user.uid;
                             const _applyAdmin = () => {
-                                if (cloudIsAdmin && !isAdminUnlocked && adminGateNeeded()) unlockAdmin('Sesión de administrador');
+                                if (cloudIsAdmin && !isAdminUnlocked && adminGateNeeded()) {
+                                    if (window.__justSignedIn) { window.__justSignedIn = false; showToast('Cuenta verificada ✔ Ahora escribe tu usuario y clave de administración', 'success'); }
+                                    const _a = document.getElementById('admin-user-input'); if (_a) _a.focus();
+                                    const _er = document.getElementById('admin-auth-error'); if (_er) _er.classList.add('hidden');
+                                }
                                 else if (!cloudIsAdmin && adminGateNeeded()) showAdminAuthError(window.__rolesErr ? ('No se pudo comprobar que eres administrador (' + window.__rolesErr + '). Revisa que las reglas de Firestore estén publicadas.') : 'Esta cuenta no es de administrador. Entra con la cuenta de admin.');
                             };
                             _db.collection('gastropos_roles').doc('staff').get().then((rs) => {
                                 const d = rs.exists ? rs.data() : null;
                                 cloudIsAdmin = !!(d && Array.isArray(d.admins) && user.email && d.admins.map(x => String(x).toLowerCase()).indexOf(String(user.email).toLowerCase()) !== -1);
                                 try { localStorage.setItem(_ck, cloudIsAdmin ? '1' : '0'); } catch (e) {}
+                                window.__rolesDone = true;
                                 _applyAdmin();
                             }).catch((re) => {
                                 window.__rolesErr = (re && (re.code || re.message)) || 'error';
                                 // Sin internet: se usa lo último que se comprobó en este teléfono (las reglas siguen protegiendo los datos)
                                 try { cloudIsAdmin = localStorage.getItem(_ck) === '1'; } catch (e) { cloudIsAdmin = false; }
+                                window.__rolesDone = true;
                                 _applyAdmin();
                             });
                             };
