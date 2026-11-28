@@ -2134,11 +2134,15 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 + '<h2 style="text-align:center;font-weight:900;font-size:18px;margin:8px 0 4px">' + escapeHtmlText(storeConfig.businessName || 'Punto de venta') + '</h2>'
                 + '<p style="text-align:center;font-size:12px;color:#94a3b8;margin:0 0 16px">Inicia sesión (usuario y contraseña)</p>'
                 + '<input id="staff-login-email" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="Usuario" required style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #475569;background:#020617;color:#fff;margin-bottom:10px;font-size:16px">'
-                + '<input id="staff-login-pass" type="password" autocomplete="current-password" placeholder="Contraseña" required style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #475569;background:#020617;color:#fff;margin-bottom:10px;font-size:16px">'
+                + '<div style="position:relative;margin-bottom:10px"><input id="staff-login-pass" type="password" autocomplete="current-password" placeholder="Contraseña" required style="width:100%;box-sizing:border-box;padding:12px 44px 12px 12px;border-radius:12px;border:1px solid #475569;background:#020617;color:#fff;font-size:16px"><button type="button" id="staff-login-eye" aria-label="Mostrar contraseña" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:#94a3b8;font-size:18px;padding:8px;cursor:pointer">👁</button></div>'
                 + '<p id="staff-login-err" style="color:#fb7185;font-size:12px;min-height:16px;margin:0 0 8px"></p>'
                 + '<button type="submit" style="width:100%;padding:12px;border-radius:12px;background:#10b981;color:#020617;font-weight:900;font-size:14px;border:0">Entrar</button>'
                 + '</form>';
             document.body.appendChild(el);
+            document.getElementById('staff-login-eye').addEventListener('click', () => {
+                const i = document.getElementById('staff-login-pass');
+                i.type = i.type === 'password' ? 'text' : 'password';
+            });
             document.getElementById('staff-login-form').addEventListener('submit', async (ev) => {
                 ev.preventDefault();
                 const err = document.getElementById('staff-login-err');
@@ -3815,12 +3819,14 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                 const typed = input.value;
                 const userTyped = ((document.getElementById('admin-user-input') || {}).value || '').trim().toLowerCase();
                 // Con Firebase activo, este mismo panel inicia la sesión de la nube (un solo login)
-                if (adminAuthMode === 'login' && AUTH_ON && !cloudAuthUser && window.__fbAuth) {
+                if (adminAuthMode === 'login' && AUTH_ON) {
+                    if (!window.__fbAuth) { showAdminAuthError('No se pudo conectar con el servidor. Revisa tu internet e intenta de nuevo.'); return; }
                     if (!userTyped || !typed) { showAdminAuthError('Escribe tu usuario y contraseña.'); return; }
                     let _em = userTyped;
                     if (_em.indexOf('@') === -1) _em += '@' + ((typeof AUTH_EMAIL_DOMAIN !== 'undefined' && AUTH_EMAIL_DOMAIN) || 'pargo.mx');
                     try {
                         await window.__fbAuth.signInWithEmailAndPassword(_em, typed);
+                        try { const _cu = window.__fbAuth.currentUser; if (_cu && window.__checkAdminRole) window.__checkAdminRole(_cu); } catch (e) {}
                         input.value = '';
                         const _ue = document.getElementById('admin-user-input'); if (_ue) _ue.value = '';
                     } catch (fe) {
@@ -3828,7 +3834,7 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                         showAdminAuthError(c === 'auth/network-request-failed' ? 'Sin conexión a internet.' : c === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos.' : 'Usuario o contraseña incorrectos.');
                         input.value = ''; input.focus();
                     }
-                    return; // al iniciar sesión, el sistema comprueba si es admin y abre solo
+                    return; // al iniciar sesión, el sistema comprueba si es admin y abre solo (ya no hay clave de respaldo)
                 }
                 const savedUser = (storeConfig.adminAuth && storeConfig.adminAuth.user) || '';
                 if (adminAuthMode === 'login') {
@@ -7745,12 +7751,26 @@ html.admin-auth-open::-webkit-scrollbar, html.admin-auth-open *::-webkit-scrollb
                             if (ov) ov.style.display = 'none';
                             if (!_started) { _started = true; startSync(); }
                             // ¿Es la cuenta de administrador? Entonces también abre el panel de Admin (un solo inicio de sesión)
+                            window.__checkAdminRole = (user) => {
+                            window.__rolesErr = '';
+                            const _ck = 'pargo_is_admin_' + user.uid;
+                            const _applyAdmin = () => {
+                                if (cloudIsAdmin && !isAdminUnlocked && adminGateNeeded()) unlockAdmin('Sesión de administrador');
+                                else if (!cloudIsAdmin && adminGateNeeded()) showAdminAuthError(window.__rolesErr ? ('No se pudo comprobar que eres administrador (' + window.__rolesErr + '). Revisa que las reglas de Firestore estén publicadas.') : 'Esta cuenta no es de administrador. Entra con la cuenta de admin.');
+                            };
                             _db.collection('gastropos_roles').doc('staff').get().then((rs) => {
                                 const d = rs.exists ? rs.data() : null;
                                 cloudIsAdmin = !!(d && Array.isArray(d.admins) && user.email && d.admins.map(x => String(x).toLowerCase()).indexOf(String(user.email).toLowerCase()) !== -1);
-                                if (cloudIsAdmin && !isAdminUnlocked && adminGateNeeded()) unlockAdmin('Sesión de administrador');
-                                else if (!cloudIsAdmin && adminGateNeeded()) showAdminAuthError('No se pudo confirmar que esta cuenta sea de administrador. Si ya tenías una clave de administración, escríbela.');
-                            }).catch(() => { if (adminGateNeeded()) showAdminAuthError('Sesión iniciada. Escribe tu clave de administración.'); });
+                                try { localStorage.setItem(_ck, cloudIsAdmin ? '1' : '0'); } catch (e) {}
+                                _applyAdmin();
+                            }).catch((re) => {
+                                window.__rolesErr = (re && (re.code || re.message)) || 'error';
+                                // Sin internet: se usa lo último que se comprobó en este teléfono (las reglas siguen protegiendo los datos)
+                                try { cloudIsAdmin = localStorage.getItem(_ck) === '1'; } catch (e) { cloudIsAdmin = false; }
+                                _applyAdmin();
+                            });
+                            };
+                            window.__checkAdminRole(user);
                         } else {
                             if (adminGateNeeded()) {
                                 // Pantalla principal (admin): el login es el panel con el logo
